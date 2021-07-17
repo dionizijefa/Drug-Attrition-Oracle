@@ -55,13 +55,11 @@ class TransformerNet(pl.LightningModule, ABC):
     def __init__(
             self,
             hparams,
-            data_dir: Optional[Path],
             reduce_lr: Optional[bool] = True,
     ):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.data_dir = data_dir
         self.model_params = {
             'd_atom': 28,
             'd_model': 1024,
@@ -78,7 +76,7 @@ class TransformerNet(pl.LightningModule, ABC):
         }
 
         self.model = make_model(**self.model_params)
-        pretrained_name = '/home/dfa/AI4EU/pretrained_weights.pt'
+        pretrained_name = root / 'pretrained_weights.pt'
         pretrained_state_dict = torch.load(pretrained_name)
         pl.seed_everything(hparams['seed'])
 
@@ -153,7 +151,7 @@ class TransformerNet(pl.LightningModule, ABC):
         adjacency_matrix, node_features, distance_matrix, y = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
-        pos_weight = torch.Tensor([(1900 / 120)])
+        pos_weight = torch.Tensor([(1369 / 103)])
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y)
 
@@ -191,6 +189,7 @@ class TransformerNet(pl.LightningModule, ABC):
         items["v_num"] = version
         return items
 
+"""
     def train_dataloader(self):
         X, y = load_data_from_df('/home/dfa/AI4EU/train_input.csv', one_hot_formal_charge=True)
         data_loader = construct_loader(X, y, self.hparams.batch_size)
@@ -214,6 +213,7 @@ class TransformerNet(pl.LightningModule, ABC):
                           self.hparams.batch_size,
                           num_workers=8, drop_last=True,
                           pin_memory=True)
+"""
 
 
 def main():
