@@ -268,8 +268,8 @@ def main():
     X, y = load_data_from_smiles(chembl_4_smiles['smiles'], chembl_4_smiles['withdrawn'])
     data_loader = construct_loader(X, y, batch_size=conf.batch_size)
 
-    train_test_splitter = StratifiedKFold(n_splits=5, random_state=0)
-    train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15, random_state=0)
+    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
     fold_ap = []
     fold_auc_roc = []
