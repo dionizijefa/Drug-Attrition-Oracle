@@ -12,20 +12,21 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.metrics.functional import average_precision, auroc
+from torchmetrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader, WeightedRandomSampler, Subset
 import torch
-from featurization.data_utils import load_data_from_df, construct_loader, load_data_from_smiles
+from featurization.data_utils import load_data_from_df, construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
+
 root = Path(__file__).resolve().parents[1].absolute()
 
 
 @dataclasses.dataclass(frozen=True)
 class Conf:
-    gpus: int = 2
+    gpus: int = 1
     seed: int = 42
     use_16bit: bool = False
     save_dir = '{}/models/'.format(root)
@@ -48,7 +49,6 @@ class Conf:
 
     def __str__(self):
         return pformat(dataclasses.asdict(self))
-
 
 
 class TransformerNet(pl.LightningModule, ABC):
@@ -104,8 +104,8 @@ class TransformerNet(pl.LightningModule, ABC):
                  metrics.get("loss"),
                  prog_bar=False, on_step=False)
         self.log('val_loss_epoch',
-                  metrics.get("loss"),
-                  on_step=False, on_epoch=True, prog_bar=False)
+                 metrics.get("loss"),
+                 on_step=False, on_epoch=True, prog_bar=False)
         return {
             "predictions": metrics.get("predictions"),
             "targets": metrics.get("targets"),
@@ -147,18 +147,19 @@ class TransformerNet(pl.LightningModule, ABC):
         }
         self.log_dict(log_metrics)
 
-    def shared_step(self, batch):
+    def shared_step(self, batch, batchidx):
         adjacency_matrix, node_features, distance_matrix, y = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
-        y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
-        pos_weight = torch.Tensor([(1369 / 103)])
+        # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
+        y_hat = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+        pos_weight = torch.Tensor([(1369 / 103)]).to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y)
 
         return {
             'loss': loss,
             'predictions': y_hat,
-            'targets': y,
+            'targets': y.int(),
         }
 
     def configure_optimizers(self):
@@ -189,38 +190,12 @@ class TransformerNet(pl.LightningModule, ABC):
         items["v_num"] = version
         return items
 
-"""
-    def train_dataloader(self):
-        X, y = load_data_from_df('/home/dfa/AI4EU/train_input.csv', one_hot_formal_charge=True)
-        data_loader = construct_loader(X, y, self.hparams.batch_size)
-        return DataLoader(data_loader,
-                          self.hparams.batch_size,
-                          num_workers=8, drop_last=True,
-                          pin_memory=True)
-
-    def val_dataloader(self):
-        X, y = load_data_from_df('/home/dfa/AI4EU/valid_input.csv', one_hot_formal_charge=True)
-        data_loader = construct_loader(X, y, self.batch_size)
-        return DataLoader(data_loader,
-                          self.hparams.batch_size,
-                          num_workers=8, drop_last=True,
-                          pin_memory=True)
-
-    def test_dataloader(self):
-        X, y = load_data_from_df('/home/dfa/AI4EU/test_input.csv', one_hot_formal_charge=True)
-        data_loader = construct_loader(X, y, self.hparams.batch_size)
-        return DataLoader(data_loader,
-                          self.hparams.batch_size,
-                          num_workers=8, drop_last=True,
-                          pin_memory=True)
-"""
-
 
 def main():
     conf = Conf(
         lr=1e-4,
-        batch_size=64,
-        epochs=300,
+        batch_size=32,
+        epochs=1,
         reduce_lr=True,
     )
 
@@ -262,33 +237,49 @@ def main():
         ),
         deterministic=True,
         auto_lr_find=False,
+        num_sanity_val_steps=0
     )
+
     chembl_4_smiles = pd.read_csv(root / 'data/chembl_4_smiles.csv')[['smiles', 'withdrawn']]
     chembl_4_smiles = chembl_4_smiles.sample(frac=1, random_state=0)
-    X, y = load_data_from_smiles(chembl_4_smiles['smiles'], chembl_4_smiles['withdrawn'])
-    data_loader = construct_loader(X, y, batch_size=conf.batch_size)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
     fold_ap = []
     fold_auc_roc = []
+    cv_fold = []
 
-    for k, (train_index, test_index) in enumerate(train_test_splitter.split(data_loader.dataset, y)):
-        test_data_loader = DataLoader(Subset(data_loader.dataset, test_index.tolist()))
-        train_data_loader = DataLoader(Subset(data_loader.dataset, train_index.tolist()))
-        train_labels = [i.y[0] for i in train_data_loader.dataset]
+    for k, (train_index, test_index) in enumerate(
+            train_test_splitter.split(chembl_4_smiles, chembl_4_smiles['withdrawn'])):
+        X_test, y_test = load_data_from_smiles(chembl_4_smiles.iloc[test_index]['smiles'],
+                                               chembl_4_smiles.iloc[test_index]['withdrawn'],
+                                               one_hot_formal_charge=True)
+        test_dataset = construct_dataset(X_test, y_test)
+        test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
-        for train_index, val_index in train_val_splitter.split(train_data_loader.dataset, train_labels):
-            train_data_loader = DataLoader(Subset(train_data_loader.dataset, train_index.tolist()))
-            val_data_loader = DataLoader(Subset(train_data_loader.dataset, val_index.tolist()))
+        train_data = chembl_4_smiles.iloc[train_index]
 
-            trainer.fit(model, train_data_loader, val_data_loader)
-            results = trainer.test(test_data_loader)
+        for train_index_2, val_index in train_val_splitter.split(train_data, train_data['withdrawn']):
+            X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
+                                                 train_data.iloc[val_index]['withdrawn'],
+                                                 one_hot_formal_charge=True)
+            val_dataset = construct_dataset(X_val, y_val)
+            val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
+
+            X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
+                                                     train_data.iloc[train_index_2]['withdrawn'],
+                                                     one_hot_formal_charge=True)
+            train_dataset = construct_dataset(X_train, y_train)
+            train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
+                                      batch_size=conf.batch_size)
+
+            trainer.fit(model, train_loader, val_loader)
+            results = trainer.test(model, test_loader)
             results_path = Path(root / "results")
             test_ap = round(results[0]['test_ap'], 3)
             test_auc = round(results[0]['test_auc'], 3)
-            cv_fold = k
+            cv_fold.append(k)
 
             fold_ap.append(test_ap)
             fold_auc_roc.append(test_auc)
@@ -316,7 +307,10 @@ def main():
         print('AP for fold {}= {}'.format(i, result))
 
     for i, result in enumerate(fold_auc_roc):
-        print('AP for fold {}= {}'.format(i, result))
+        print('AUC for fold {}= {}'.format(i, result))
+
+    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
+        results_path / "{}_metrics.csv".format(logger.version))
 
 
 if __name__ == '__main__':
