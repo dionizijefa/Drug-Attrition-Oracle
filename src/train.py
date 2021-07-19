@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler, Subset
 import torch
 from featurization.data_utils import load_data_from_df, construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
+import click
 
 root = Path(__file__).resolve().parents[1].absolute()
 
@@ -190,8 +191,9 @@ class TransformerNet(pl.LightningModule, ABC):
         items["v_num"] = version
         return items
 
-
-def main():
+@click.command()
+@click.option('-train_data', 'string', default='chembl_4_smiles.csv')
+def main(train_data):
     conf = Conf(
         lr=1e-4,
         batch_size=32,
@@ -240,8 +242,8 @@ def main():
         num_sanity_val_steps=0
     )
 
-    chembl_4_smiles = pd.read_csv(root / 'data/chembl_4_smiles.csv')[['smiles', 'withdrawn']]
-    chembl_4_smiles = chembl_4_smiles.sample(frac=1, random_state=0)
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', 'withdrawn']]
+    data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
@@ -251,14 +253,15 @@ def main():
     cv_fold = []
 
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(chembl_4_smiles, chembl_4_smiles['withdrawn'])):
-        X_test, y_test = load_data_from_smiles(chembl_4_smiles.iloc[test_index]['smiles'],
-                                               chembl_4_smiles.iloc[test_index]['withdrawn'],
+            train_test_splitter.split(data, data['withdrawn'])
+    ):
+        X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
+                                               data.iloc[test_index]['withdrawn'],
                                                one_hot_formal_charge=True)
         test_dataset = construct_dataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
-        train_data = chembl_4_smiles.iloc[train_index]
+        train_data = data.iloc[train_index]
 
         for train_index_2, val_index in train_val_splitter.split(train_data, train_data['withdrawn']):
             X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
