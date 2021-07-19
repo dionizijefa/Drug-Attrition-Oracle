@@ -371,7 +371,6 @@
 369,DB00512,C(=O)([C@H](NC)CC(C)C)N[C@H]1C(=O)N[C@H](C(=O)N[C@H]2C(=O)N[C@H]3C(=O)N[C@H](C(=O)N[C@H](C(=O)O)c4c(-c5c(O)ccc3c5)c(O)cc(O)c4)[C@@H](c6cc(Cl)c(Oc7c(O[C@@H]8O[C@@H]([C@@H](O)[C@H](O)[C@H]8O[C@@H]9O[C@H]([C@H]([C@@](N)(C9)C)O)C)CO)c(Oc%10c(Cl)cc(cc%10)[C@H]1O)cc2c7)cc6)O)CC(=O)N,0
 370,DB00513,C(=O)(O)CCCCCN,0
 371,DB00514,O(c1cc2c(cc1)C[C@@H]3N(CC[C@@]24[C@@H]3CCCC4)C)C,0
-372,DB00515,Cl[Pt+2](Cl)([NH3])[NH3],0
 373,DB00517,C(=O)(OC1CC2[N+](C(C1)CC2)(C)C)C(CCC)CCC,0
 374,DB00518,C(=O)(OC)Nc1nc2c(cc(SCCC)cc2)[nH]1,0
 375,DB00519,C(=O)(OCC)[C@@H](N[C@H](C(=O)N1[C@H](C(=O)O)C[C@@H]2[C@@H]1CCCC2)C)CCc3ccccc3,0

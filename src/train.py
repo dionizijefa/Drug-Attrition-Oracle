@@ -192,7 +192,7 @@ class TransformerNet(pl.LightningModule, ABC):
         return items
 
 @click.command()
-@click.option('-train_data', 'string', default='chembl_4_smiles.csv')
+@click.option('-train_data', default='chembl_4_smiles.csv')
 def main(train_data):
     conf = Conf(
         lr=1e-4,
