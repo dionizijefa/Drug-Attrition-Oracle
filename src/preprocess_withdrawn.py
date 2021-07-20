@@ -12,7 +12,6 @@ import click
 def preprocess(phase):
     data_path = Path(__file__).parent
     data = pd.read_csv(data_path / 'raw/chembl.csv', sep=';', error_bad_lines=True)
-    drugbank = pd.read_csv(data_path / 'raw/structure links.csv')
 
     """
     Preprocess chembl
@@ -25,7 +24,7 @@ def preprocess(phase):
     data = data.loc[data['Drug Type'] != "9:Inorganic"]
     data = data.loc[data['Phase'] >= phase]
 
-    data = data[['Parent Molecule', 'Synonyms', 'Phase', 'ATC Codes', 'Level 4 ATC Codes', 'Level 3 ATC Codes',
+    data = data[['Name', 'Parent Molecule', 'Synonyms', 'Phase', 'ATC Codes', 'Level 4 ATC Codes', 'Level 3 ATC Codes',
                  'Level 2 ATC Codes', 'Level 1 ATC Codes',
                  'Drug Type', 'Passes Rule of Five', 'Chirality', 'Prodrug', 'Oral', 'Parenteral', 'Topical',
                  'Black Box', 'Availability Type', 'Withdrawn Year',
@@ -52,7 +51,8 @@ def preprocess(phase):
                          'Withdrawn Reason': 'withdrawn_reason',
                          'Withdrawn Country': 'withdrawn_country',
                          'Withdrawn Class': 'withdrawn_class',
-                         'Smiles': 'smiles'}, inplace=True)
+                         'Smiles': 'smiles',
+                         'Name': 'name'}, inplace=True)
 
     """
     chembl.loc[chembl['Parent Molecule'] == 'CHEMBL121', 'pubchem_cid'] = 77999
@@ -339,9 +339,9 @@ def preprocess(phase):
 
     data['withdrawn'] = 0
     data.loc[data['availability_type'] == 'Withdrawn', 'withdrawn'] = 1
-    data.to_csv('/home/dionizije/Documents/DAO/data/not_from_script/chembl_4_full.csv')
-    data[['chembl_id', 'pubchem_cid', 'smiles', 'parent_smiles', 'chembl_tox']].to_csv(
-        '/home/dionizije/Documents/DAO/data/not_from_script/chembl_4_smiles.csv')
+    data.to_csv('/home/dionizije/Documents/DAO/data/not_from_script/chembl_{}_full.csv'.format(phase))
+    data[['name', 'chembl_id', 'pubchem_cid', 'smiles', 'parent_smiles', 'chembl_tox']].to_csv(
+        '/home/dionizije/Documents/DAO/data/not_from_script/chembl_{}_smiles.csv'.format(phase))
 
     """
     chembl.loc[chembl['Parent Molecule'] == 'CHEMBL2109172', 'pubchem_cid'] = 134687958
@@ -399,7 +399,7 @@ def preprocess(phase):
     chembl = chembl.loc[chembl['pubchem_cid'] != 0]
     """
 
-    """ Process drugbank """
+    """
     drugbank = drugbank.loc[~drugbank['InChIKey'].isin(data['inchi_key'])]
     drugbank = drugbank[['DrugBank ID', 'InChIKey', 'Drug Groups', 'SMILES', 'Name']]
     drugbank.rename(columns={'DrugBank ID': 'drugbank_id',
@@ -510,9 +510,10 @@ def preprocess(phase):
     drugbank['withdrawn'] = 0
     drugbank.loc[drugbank['drug_groups'].str.contains('withdrawn'), 'withdrawn'] = 1
     drugbank = drugbank.loc[~drugbank['smiles'].isna()]
-    drugbank.to_csv('/home/dionizije/Documents/DAO/data/not_from_script/drugbank_4_full.csv')
+    drugbank.to_csv('/home/dionizije/Documents/DAO/data/not_from_script/drugbank_{}_full.csv'.format(phase))
     drugbank[['molecule_chembl_id', 'drug_groups', 'smiles', 'parent_smiles', 'chembl_tox', 'withdrawn']].to_csv(
-            '/home/dionizije/Documents/DAO/data/not_from_script/drugbank_4_smiles.csv')
+            '/home/dionizije/Documents/DAO/data/not_from_script/drugbank_{}_smiles.csv'.format(phase))
+    """
 
 if __name__ == "__main__":
     preprocess()
