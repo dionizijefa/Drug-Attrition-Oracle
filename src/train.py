@@ -197,7 +197,7 @@ def main(train_data):
     conf = Conf(
         lr=1e-4,
         batch_size=32,
-        epochs=1,
+        epochs=100,
         reduce_lr=True,
     )
 
