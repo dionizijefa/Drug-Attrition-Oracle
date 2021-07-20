@@ -74,7 +74,7 @@ def preprocess(phase):
     """
 
     # try search by synonyms
-    list_of_features = ['molecule_type', 'structure_type', 'therapeutic_flag']
+    list_of_features = ['molecule_type', 'structure_type', 'therapeutic_flag', 'indication_class']
     list_of_properties = ['alogp', 'aromatic_rings', 'cx_logd', 'cx_logp', 'cx_most_apka', 'cx_most_bpka', 'full_mwt',
                           'hba', 'hba_lipinski',
                           'hbd', 'hbd_lipinski', 'heavy_atoms', 'molecular_species', 'mw_freebase', 'mw_monoisotopic',
@@ -349,9 +349,9 @@ def preprocess(phase):
 
     data['withdrawn'] = 0
     data.loc[data['availability_type'] == 'Withdrawn', 'withdrawn'] = 1
-    data.to_csv('/home/dionizije/Documents/DAO/data/not_from_script/chembl_{}_full.csv'.format(phase))
-    data[['name', 'chembl_id', 'pubchem_cid', 'smiles', 'parent_smiles', 'chembl_tox']].to_csv(
-        '/home/dionizije/Documents/DAO/data/not_from_script/chembl_{}_smiles.csv'.format(phase))
+    data.to_csv(data_path / 'data/chembl_{}_full.csv'.format(phase))
+    data[['chembl_id', 'pubchem_cid', 'smiles', 'parent_smiles', 'chembl_tox']].to_csv(
+        data_path / 'data/chembl_{}_smiles.csv'.format(phase))
 
     """
     chembl.loc[chembl['Parent Molecule'] == 'CHEMBL2109172', 'pubchem_cid'] = 134687958
