@@ -8,7 +8,7 @@ import click
 
 
 @click.command()
-@click.option('--phase', default=4, help='Minimum phase of the drug to use')
+@click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
     data_path = Path(__file__).parent
     data = pd.read_csv(data_path / 'raw/chembl.csv', sep=';', error_bad_lines=True)
@@ -94,6 +94,7 @@ def preprocess(phase):
 
     molecule = new_client.molecule
 
+    print('Updating chembl features')
     for mol in tqdm(list(data['chembl_id']), position=0, leave=True):
         try:
             res = molecule.get(mol)
@@ -149,8 +150,11 @@ def preprocess(phase):
             print(e)
             print("Molecule {} doesn't exist".format(mol))
 
+    print('Finished adding chembl features')
+
     data = data.loc[~((data['smiles'] == 'missing') & (data['parent_smiles'] == 'missing'))]
 
+    print('Adding toxicity')
     toxic_carcinogenic = ['CHEMBL103', 'CHEMBL1200430', 'CHEMBL1200686', 'CHEMBL1200973',
                           'CHEMBL1201314', 'CHEMBL1201572', 'CHEMBL1201581', 'CHEMBL1201866',
                           'CHEMBL1220', 'CHEMBL135', 'CHEMBL137', 'CHEMBL1393', 'CHEMBL1456',
@@ -309,7 +313,10 @@ def preprocess(phase):
                 data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = effect
             else:
                 data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
+    print('Finished adding toxicity')
 
+
+    print('Adding mechanisms')
     data['action_type'] = 'missing'
     data['direct_interaction'] = 'missing'
     data['disease_efficacy'] = 'missing'
@@ -329,6 +336,10 @@ def preprocess(phase):
                         old_label = data.loc[data['chembl_id'] == molecule][i].values[0]
                         data.loc[data['chembl_id'] == molecule, i] = '{}+{}'.format(old_label, mechanism[i])
 
+    print('Finished adding mechanisms')
+
+
+    print('Adding pubchem cids by inchikey')
     data['pubchem_cid'] = 'missing'
     for i in tqdm(list(data['inchi_key'])):
         try:
