@@ -10,8 +10,8 @@ import click
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data_path = Path(__file__).parent
-    data = pd.read_csv(data_path / 'raw/chembl.csv', sep=';', error_bad_lines=True)
+    data_path = Path(__file__).resolve().parents[1].absolute()
+    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
 
     """
     Preprocess chembl
@@ -24,7 +24,7 @@ def preprocess(phase):
     data = data.loc[data['Drug Type'] != "9:Inorganic"]
     data = data.loc[data['Phase'] >= phase]
 
-    data = data[['Name', 'Parent Molecule', 'Synonyms', 'Phase', 'ATC Codes', 'Level 4 ATC Codes', 'Level 3 ATC Codes',
+    data = data[['Parent Molecule', 'Synonyms', 'Phase', 'ATC Codes', 'Level 4 ATC Codes', 'Level 3 ATC Codes',
                  'Level 2 ATC Codes', 'Level 1 ATC Codes',
                  'Drug Type', 'Passes Rule of Five', 'Chirality', 'Prodrug', 'Oral', 'Parenteral', 'Topical',
                  'Black Box', 'Availability Type', 'Withdrawn Year',
@@ -51,8 +51,7 @@ def preprocess(phase):
                          'Withdrawn Reason': 'withdrawn_reason',
                          'Withdrawn Country': 'withdrawn_country',
                          'Withdrawn Class': 'withdrawn_class',
-                         'Smiles': 'smiles',
-                         'Name': 'name'}, inplace=True)
+                         'Smiles': 'smiles'}, inplace=True)
 
     """
     chembl.loc[chembl['Parent Molecule'] == 'CHEMBL121', 'pubchem_cid'] = 77999
