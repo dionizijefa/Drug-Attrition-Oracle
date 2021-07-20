@@ -25,7 +25,9 @@ import click
 root = Path(__file__).resolve().parents[1].absolute()
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(
+    #frozen=True
+)
 class Conf:
     gpus: int = 1
     seed: int = 42
@@ -36,6 +38,7 @@ class Conf:
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
+    pos_weight: torch.Tensor = torch.Tensor([8])
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -153,7 +156,7 @@ class TransformerNet(pl.LightningModule, ABC):
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
         y_hat = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
-        pos_weight = torch.Tensor([(1369 / 103)]).to("cuda")
+        pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y)
 
@@ -192,18 +195,13 @@ class TransformerNet(pl.LightningModule, ABC):
         return items
 
 @click.command()
-@click.option('-train_data', 'string', default='chembl_4_smiles.csv')
+@click.option('-train_data', default='chembl_4_smiles.csv')
 def main(train_data):
     conf = Conf(
         lr=1e-4,
         batch_size=32,
-        epochs=1,
+        epochs=100,
         reduce_lr=True,
-    )
-
-    model = TransformerNet(
-        conf.to_hparams(),
-        reduce_lr=conf.reduce_lr,
     )
 
     logger = TensorBoardLogger(
@@ -222,25 +220,6 @@ def main(train_data):
                                         mode='max',
                                         patience=15,
                                         verbose=False)
-
-    print("Starting training")
-    trainer = pl.Trainer(
-        max_epochs=conf.epochs,
-        gpus=[1],  # [0]
-        logger=logger,
-        resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
-        weights_summary='top',
-        callbacks=[early_stop_callback],
-        checkpoint_callback=ModelCheckpoint(
-            dirpath=(logger.log_dir + '/checkpoint/'),
-            monitor='val_ap_epoch',
-            mode='max',
-            save_top_k=1,
-        ),
-        deterministic=True,
-        auto_lr_find=False,
-        num_sanity_val_steps=0
-    )
 
     data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', 'withdrawn']]
     data = data.sample(frac=1, random_state=0)
@@ -276,6 +255,35 @@ def main(train_data):
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
+
+            pos_weight = torch.Tensor([(train_data.iloc[train_index_2]['withdrawn'].value_counts()[0] /
+                                        train_data.iloc[train_index_2]['withdrawn'].value_counts()[1])])
+
+            conf.pos_weight = pos_weight
+
+            model = TransformerNet(
+                conf.to_hparams(),
+                reduce_lr=conf.reduce_lr,
+            )
+
+            print("Starting training")
+            trainer = pl.Trainer(
+                max_epochs=conf.epochs,
+                gpus=[1],  # [0]
+                logger=logger,
+                resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
+                weights_summary='top',
+                callbacks=[early_stop_callback],
+                checkpoint_callback=ModelCheckpoint(
+                    dirpath=(logger.log_dir + '/checkpoint/'),
+                    monitor='val_ap_epoch',
+                    mode='max',
+                    save_top_k=1,
+                ),
+                deterministic=True,
+                auto_lr_find=False,
+                num_sanity_val_steps=0
+            )
 
             trainer.fit(model, train_loader, val_loader)
             results = trainer.test(model, test_loader)
