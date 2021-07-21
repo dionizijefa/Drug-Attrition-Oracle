@@ -198,7 +198,8 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-train_data', default='chembl_4_smiles.csv')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
-def main(train_data, withdrawn_col, batch_size):
+@click.option('--gpu', default=1)
+def main(train_data, withdrawn_col, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -271,7 +272,7 @@ def main(train_data, withdrawn_col, batch_size):
             print("Starting training")
             trainer = pl.Trainer(
                 max_epochs=conf.epochs,
-                gpus=[1],  # [0]
+                gpus=[gpu],  # [0]
                 logger=logger,
                 resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
                 weights_summary='top',
