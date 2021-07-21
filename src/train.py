@@ -197,10 +197,11 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.command()
 @click.option('-train_data', default='chembl_4_smiles.csv')
 @click.option('-withdrawn_col', default='withdrawn')
-def main(train_data, withdrawn_col):
+@click.option('-batch_size', default=16)
+def main(train_data, withdrawn_col, batch_size):
     conf = Conf(
         lr=1e-4,
-        batch_size=32,
+        batch_size=batch_size,
         epochs=100,
         reduce_lr=True,
     )
