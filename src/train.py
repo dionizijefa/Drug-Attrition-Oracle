@@ -196,7 +196,8 @@ class TransformerNet(pl.LightningModule, ABC):
 
 @click.command()
 @click.option('-train_data', default='chembl_4_smiles.csv')
-def main(train_data):
+@click.option('-withdrawn_col', default='withdrawn')
+def main(train_data, withdrawn_col):
     conf = Conf(
         lr=1e-4,
         batch_size=32,
@@ -221,7 +222,7 @@ def main(train_data):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', 'withdrawn']]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
     data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
@@ -232,32 +233,32 @@ def main(train_data):
     cv_fold = []
 
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data['withdrawn'])
+            train_test_splitter.split(data, data[withdrawn_col])
     ):
         X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
-                                               data.iloc[test_index]['withdrawn'],
+                                               data.iloc[test_index][withdrawn_col],
                                                one_hot_formal_charge=True)
         test_dataset = construct_dataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
         train_data = data.iloc[train_index]
 
-        for train_index_2, val_index in train_val_splitter.split(train_data, train_data['withdrawn']):
+        for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
             X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
-                                                 train_data.iloc[val_index]['withdrawn'],
+                                                 train_data.iloc[val_index][withdrawn_col],
                                                  one_hot_formal_charge=True)
             val_dataset = construct_dataset(X_val, y_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
             X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
-                                                     train_data.iloc[train_index_2]['withdrawn'],
+                                                     train_data.iloc[train_index_2][withdrawn_col],
                                                      one_hot_formal_charge=True)
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
 
-            pos_weight = torch.Tensor([(train_data.iloc[train_index_2]['withdrawn'].value_counts()[0] /
-                                        train_data.iloc[train_index_2]['withdrawn'].value_counts()[1])])
+            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
+                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
 
             conf.pos_weight = pos_weight
 
