@@ -274,6 +274,7 @@ def main(train_data, withdrawn_col, batch_size, gpu):
 
         trainer.fit(model, train_loader, val_loader)
 
+        results_path = Path(root / "results")
         if not results_path.exists():
             results_path.mkdir(exist_ok=True, parents=True)
             with open(results_path / "production_results.txt", "w") as file:
