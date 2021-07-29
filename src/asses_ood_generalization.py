@@ -197,7 +197,7 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-train_data', default='chembl_4_smiles.csv')
 @click.option('-train_set', default='chembl')
 @click.option('-batch_size', default=16)
-@click.option('--gpu', default=1)
+@click.option('-gpu', default=1)
 def main(train_data, train_set, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
