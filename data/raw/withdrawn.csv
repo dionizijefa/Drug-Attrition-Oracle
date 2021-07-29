@@ -1,0 +1,252 @@
+Name,Pubchem_cid,CHEMBLID,Countries,Toxicity type
+Telaprevir,CID3010818,CHEMBL231813,USA,toxic_dermis
+Ribavirin,CID37542,CHEMBL1643,USA;EU,toxic_respiratory
+Ketoconazole,CID47576,CHEMBL295698,EU;AUS,toxic_hepa
+Tetrazepam,CID25215,CHEMBL2105527,EU,toxic_dermis
+Clorazepate,CID2809,CHEMBL1213252,USA,toxic_systemic
+Celecoxib,CID2662,CHEMBL118,EU,toxic_cardio
+Pioglitazone,CID4829,CHEMBL595,FRA;DEU,toxic_carcinogenic
+Dolasetron,CID3033818,CHEMBL2368925,DEU,toxic_cardio
+Indoramin,CID33625,CHEMBL279516,GBR,toxic_cardio
+Sitaxentan,CID216235,CHEMBL282724,DEU,toxic_hepa
+Rosiglitazone,CID77999,CHEMBL121,EU,toxic_cardio
+Sibutramine,CID5210,CHEMBL1419,Worldwide,toxic_cardio
+Bufexamac,CID2466,CHEMBL94394,EU,toxic_systemic
+Propoxyphene,CID10100,CHEMBL1213351,Worldwide,toxic_cardio
+Orciprenaline,CID4086,CHEMBL776,GBR,toxic_cardio
+Benfluorex,CID2318,CHEMBL400599,EU,toxic_cardio
+Rimonabant,CID104850,CHEMBL111,Worldwide,toxic_neuro
+Lumiracoxib,CID151166,CHEMBL404108,Worldwide,toxic_hepa
+Tegaserod,CID5362436,CHEMBL76370,USA,toxic_cardio
+Pergolide,CID47811,CHEMBL531,USA,toxic_cardio
+Clobutinol,CID26937,CHEMBL1474889,FRA,toxic_cardio
+Clarisoprodol,CID2576,CHEMBL1233,SWE,toxic_systemic
+Ximelagatran,CID5478933,CHEMBL522038,DEU,toxic_hepa
+Gatifloxacin,CID5379,CHEMBL31,USA,toxic_cardio
+Torcetrapib,CID159325,CHEMBL479527,Worldwide,toxic_cardio
+Alatrofloxacin,CID3086677,CHEMBL1201197,Worldwide,toxic_hepa
+Veralipride,CID47979,CHEMBL2105581,Worldwide,toxic_cardio
+Bicalutamide,CID2375,CHEMBL409,BEL,toxic_cardio
+Hydromorphone,CID5284570,CHEMBL398707,USA,toxic_systemic
+Thioridazine,CID5452,CHEMBL479,DUE; GBR,toxic_cardio
+Amphetamine,CID3007,CHEMBL405,CAN,toxic_cardio
+Valdecoxib,CID119607,CHEMBL865,USA,toxic_cardio
+Rofecoxib,CID5090,CHEMBL122,USA,toxic_cardio
+Dofetilide,CID71329,CHEMBL473,DEU,toxic_cardio
+Temazepam,CID5391,CHEMBL967,AUS,toxic_respiratory
+Ethinylestradiol,CID5991,CHEMBL691,DEU,toxic_systemic
+Ephedra,CID16667682,,USA,toxic_cardio
+Nefazodone,CID4449,CHEMBL623,CAN;ESP;SGP;TUR;USA,toxic_hepa
+Alphacetylmethadol,CID22308,CHEMBL2104149,USA,toxic_cardio
+Benzbromarone,CID2333,CHEMBL388590,FRA,toxic_hepa
+Repacuronium,CID5311399,CHEMBL1201352,USA,toxic_respiratory
+Cerivastatin,CID446156,CHEMBL1477,Worldwide,toxic_muscoskelet
+Sparfloxacin,CID60464,CHEMBL850,USA,toxic_cardio
+Droperidol,CID3168,CHEMBL1108,GBR; IDN,toxic_cardio
+Alosetron,CID2099,CHEMBL1110,USA,toxic_gastro
+Troglitazone,CID5591,CHEMBL408,CHL;DEU;GBR;PER;USA,toxic_hepa
+Budipine,CID68778,CHEMBL334491,DEU,toxic_cardio
+Amfepramone Hydrocloride,CID7029,CHEMBL1194666,FRA;GBR;TUR;OMN;SWEtoxic_cardio,
+Phenylpropanolamine,CID4786,CHEMBL61006,CAN; USA,toxic_cardio
+Aristolochic acid,CID2236,CHEMBL93353,GBR,toxic_nephro
+Trovafloxacin,CID62959,CHEMBL428,EU; USA,toxic_hepa
+Grepafloxacin,CID72474,CHEMBL583,DEU;GBR;USA,toxic_cardio
+Cisapride,CID2769,CHEMBL1729,ARM; BDS; BHR; CAN; CUB; DEU; GBR; IDN; JPN; MUS; OMN; PHL; SGP; TUR; USA,toxic_cardio
+Levamisole,CID26879,CHEMBL1454,USA,toxic_hema
+Medifoxamine,CID36109,CHEMBL85231,FRA,toxic_hepa
+Amineptine,CID34870,CHEMBL418995,ARE;BDS;EU;FRA;MAR;THA;USA;VTN,"toxic_hepa, toxic_dermis"
+Dicyclomine,CID3042,CHEMBL1123,USA,toxic_systemic
+Tolcapone,CID4659569,CHEMBL1324,AUS;BGR;CAN;EU;GBR;ISL;LTH,toxic_hepa
+Bromfenac,CID60726,CHEMBL1077,SAU;USA,toxic_hepa
+Ebrotidine,CID65869,CHEMBL1742471,ESP; PER,toxic_hepa
+Sertindole,CID60149,CHEMBL12713,EU,toxic_cardio
+Proxibarbal,CID17336,CHEMBL2105233,ESP;FRA;ITA;PRT;TUR,toxic_dermis
+Metrizamide,CID49800036,CHEMBL1200889,NLD,toxic_neuro
+Terfenadine,CID5405,CHEMBL17157,ARG;BRA;CHL;EU;ISL;MUS;OMN;SAU;SGP,toxic_cardio
+Pemoline,CID4723,CHEMBL1177,CAN;GBR,toxic_hepa
+Dexfenfluramine,CID66265,CHEMBL248702,EU;GBR;USA,toxic_cardio
+Tilbroquinol,CID65592,CHEMBL1788385,FRA;CHE;MAR,toxic_hepa
+Febarbamate,CID25803,CHEMBL2104283,FRA,toxic_hepa
+Minaprine,CID4199,CHEMBL278819,FRA,toxic_neuro
+Tolrestat,CID53359,CHEMBL436,Worldwide,toxic_hepa
+Nifedipine,CID4485,CHEMBL193,N/A,toxic_cardio
+Flunitrazepam,CID3380,CHEMBL13280,FRA,toxic_systemic
+Chlormezanone,CID2717,CHEMBL1200714,Worldwide,toxic_hepa
+Coumarin,CID323,CHEMBL6466,AUS;FRA,toxic_hepa
+Ciprofibrate,CID2763,CHEMBL557555,FRA,toxic_muscoskelet
+Naftidrofuryl Oxalate,CID6604457,CHEMBL1443491,GBR,toxic_cardio
+Droxicam,CID65679,CHEMBL1213420,SP,toxic_hepa
+Felbamate,CID3331,CHEMBL1094,USA;EU,toxic_neuro
+Alpidem,CID54897,CHEMBL54349,FRA,toxic_hepa
+Omerprazole,CID4594,CHEMBL1503,DEU,toxic_neuro
+Bromocriptine Mesylate,CID31100,CHEMBL1200503,USA,toxic_neuro
+Gentamicin,CID9898639,CHEMBL3039597,NLD;CAN,toxic_neuro
+Moxisylyte,CID4260,CHEMBL159226,FRA,toxic_hepa
+Remoxipride,CID54477,CHEMBL22242,Worldwide,toxic_hema
+Ketorolac,CID3826,CHEMBL469,DEU; FRA,"toxic_nephro, toxic_hema"
+Bendazac,CID2313,CHEMBL1089221,ESP,toxic_hepa
+Zipeprol,CID36910,CHEMBL2105497,BRA; PHL,toxic_systemic
+Thiobutabarbitone,CID23710500,,DEU,toxic_nephro
+Benzarone,CID255968,CHEMBL1474963,FRA,toxic_hepa
+Pyrrolizidine,CID12558,,DEU,toxic_hepa
+Temafloxacin,CID60021,CHEMBL277100,Worldwide,"toxic_hepa, toxic_nephro, toxic_dermis, toxic_hema"
+Terconazole,CID441383,CHEMBL1306,SWE,toxic_dermis
+Encainide,CID48041,CHEMBL315838,GBR; USA,toxic_cardio
+Terodiline,CID23480,CHEMBL363295,DEU;ESP;GBR,toxic_cardio
+Fipexide,CID3351,CHEMBL254857,FRA,toxic_hepa
+Buprenorphine,CID9848990,CHEMBL511142,EGY,toxic_respiratory
+Noscapine,CID275196,CHEMBL364713,GBR,toxic_carcinogenic
+Cinchophen,CID8593,CHEMBL348000,ESP,toxic_hepa
+Dilevalol,CID134044,CHEMBL27193,Worldwide,toxic_hepa
+Metipranolol,CID31477,CHEMBL1291,GBR;USA,toxic_hema
+Acitretin,CID5284513,CHEMBL1131,NLD,toxic_teratogen
+Beclobrate,CID51348,CHEMBL152684,CHE,toxic_hepa
+Pirprofen,CID35935,CHEMBL188952,Worldwide,"toxic_hepa, toxic_gastro"
+Dinoprostone,CID5280360,CHEMBL548,GBR,toxic_muscoskelet
+Loperamide,CID3955,CHEMBL841,ID;LIY;LKA;MEX;NPL;OMN;PAK;PER;PHL;TUR,toxic_gastro
+Fenoterol,CID3343,CHEMBL32800,NZL,toxic_cardio
+Secobarbital,CID5193,CHEMBL447,FRA;NOR,toxic_systemic
+Boric acid,CID7628,CHEMBL42403,FRA;GBR;IND;PER;USA,toxic_systemic
+Atemizole,CID2247,CHEMBL296419,ARE;ARG;ARM;BDS;ESP;MUS;MYS;PHL;SGP;URT;USA;ZAF,toxic_cardio
+Etretinate,CID5282375,CHEMBL464,FRA,toxic_teratogen
+Proglumide,CID4922,CHEMBL316561,DEU,toxic_respiratory
+Tryptophan,CID6305,CHEMBL54976,AUT;BEL;CHE;DEU;GBR;JPN;MYS;OMN;SWE;USA,toxic_hema
+Exifone,CID40399,CHEMBL329522,FRA,toxic_hepa
+prenylamine,CID9801,CHEMBL24072,Worldwide,toxic_cardio
+Doxycycline,CID54671203,CHEMBL1433,FRA,toxic_hema
+Neomycin Sulfate,CID197162,CHEMBL1275977,USA,toxic_neuro
+Sulfacarbamide,CID11033,CHEMBL139877,DEU,"toxic_dermis, toxic_hema, toxic_hepa"
+Cianidanol,CID9064,CHEMBL311498,Worldwide,toxic_hema
+Sulfametoxydiazine,CID5326,CHEMBL1200359,DEU,toxic_hema
+Nikethamide,CID5497,CHEMBL2104607,Worldwide,toxic_neuro
+Isotretinoin,CID5282379,CHEMBL547,ITA,toxic_teratogen
+Mianserin,CID4184,CHEMBL6437,GBR,toxic_hema
+Floctafenine,CID3360,CHEMBL2105075,BEL,toxic_dermis
+Muzolimine,CID41386,CHEMBL1697760,CAN;DEU;FRA;GRE;NOR,toxic_neuro
+Vincamine,CID15376,CHEMBL1165342,DEU;HUN,toxic_hema
+Cinepazide,CID5282459,CHEMBL1874750,ESP,toxic_hema
+Clometacin,CID33176,CHEMBL13376,FRA,toxic_hepa
+Cyclofenil,CID2898,CHEMBL141305,FRA,toxic_hepa
+Tranylcypromine,CID5530,CHEMBL313833,FR; USA;GBR;BEL;ITA,toxic_cardio
+Iophendylate,CID7468,CHEMBL951,GBR,toxic_systemic
+Canrenone,CID13789,CHEMBL1463345,DEU,toxic_carcinogenic
+Bucetin,CID14130,CHEMBL1697856,DEU,toxic_nephro
+Suprofen,CID5359,CHEMBL956,Worldwide,toxic_nephro
+Bupropion,CID444,CHEMBL894,USA,toxic_neuro
+Hydrochlorthiazide,CID21864418,CHEMBL43686,FRA,toxic_cardio
+Suprifen,CID9701,CHEMBL30400,GBR,toxic_nephro
+Difemerine,CID165124,CHEMBL2110891,DEU,toxic_systemic
+Pentobarbital,CID4737,CHEMBL448,SWE; NOR,toxic_systemic
+Aprobarbital,CID6464,CHEMBL7863,CHE,toxic_respiratory
+Phenobarbital,CID4763,CHEMBL40,SWE; DEU,toxic_systemic; toxic_dermis
+Feprazone,CID35455,CHEMBL1452696,DEU; GBR,toxic_dermis
+Vitamin E,CID14985,CHEMBL47,USA,toxic_hepa
+Indoprofen,CID3718,CHEMBL15870,Worldwide,"toxic_carcinogenic, toxic_gastro"
+Nitrefazole,CID71900,CHEMBL1909285,AUT; DEU,"toxic_hema, toxic_hepa"
+Fenclofenac,CID65394,CHEMBL15677,GBR; NOR,toxic_dermis
+Camazepam,CID37367,CHEMBL1095282,NLD,toxic_systemic
+Althesin,CID24732,,GBR;GRE;USA,toxic_hema
+Oxolamine Citrate,CID13738,CHEMBL1620875,NLD,toxic_neuro
+Glafenine,CID3474,CHEMBL146095,Worldwide,toxic_hema
+Oxyphenbutazone,CID4641,CHEMBL1228,Worldwide,toxic_hema
+Hexobarbital,CID3608,CHEMBL7728,SWE,toxic_respiratory
+Vinbarbital,CID5284636,CHEMBL503565,SWE,toxic_respiratory
+Sulfamethoxypyridazine,CID5330,CHEMBL268869,ARE;GBR;PAK;SWE,toxic_dermis
+Isoxicam,CID54677972,CHEMBL53292,DEU;ESP;FRA;GBR;ITA;OMN;USA,toxic_dermis
+Zimelidine,CID5365247,CHEMBL37744,Worldwide,"toxic_neuro, toxic_dermis"
+Isaxonine phosphate,CID163093,CHEMBL1697751,FRA,toxic_hepa
+Zomepirac,CID5733,CHEMBL19490,Worldwide,toxic_dermis
+Dibenzepin Hydrochloride,CID443945,CHEMBL2104287,SWE,toxic_carcinogenic
+Propanidid,CID15004,CHEMBL2105345,GBR,toxic_dermis
+Indomethacin,CID3715,CHEMBL6,DEU,toxic_systemic; toxic_gastro
+Doxylamine,CID3162,CHEMBL1004,USA;GBR;DEU,toxic_teratogen
+Dimethylamylamine,CID151479,CHEMBL47794,USA,toxic_cardio
+Aminophenazone cyclamate,CID170322,CHEMBL2104635,ARE;BHR;MYS,toxic_hema
+Clomacran,CID21382,CHEMBL1615350,GBR,toxic_hepa
+Triazolam,CID5556,CHEMBL646,BRA;CAN;CAP;GBR;MUS;NOR;OMN;USA,toxic_neuro
+Benoxaprofen,CID39941,CHEMBL340978,Worldwide,"toxic_hepa, toxic_nephro"
+Timonacic,CID9934,CHEMBL358722,FRA,toxic_systemic
+Methandrostenolone,CID6300,CHEMBL1418176,GBR;USA;DEU;FRA,toxic_systemic
+Pentylenetetrazol,CID5917,CHEMBL116943,USA,toxic_neuro
+Ethyl nitrite,CID8026,CHEMBL1551365,USA,toxic_hema
+Ticrynafen,CID38409,CHEMBL267744,BRA;DEU;FRA;GBR;GRC;IND;PAN;PHL;USA;VEN,toxic_hepa
+Lynestrenol,CID5857,CHEMBL2107431,AUS,toxic_carcinogenic
+Cyclobarbital,CID5838,CHEMBL268164,FRA,toxic_systemic
+Amobarbital,CID2164,CHEMBL267894,NOR,toxic_systemic
+Sparteine Sulphate,CID72325,CHEMBL2303617,USA,toxic_teratogen
+Methapyrilene,CID4098,CHEMBL1411979,Worldwide,toxic_carcinogenic
+Pyrovalerone,CID14373,CHEMBL201960,ESP;FRA,toxic_hema; toxic_systemic
+Phenolphthalein,CID4764,CHEMBL63857,BGD;BHR;FRA;GRC;JPN;MAR;NOR;OMN;SAU;USA;YEM,"toxic_carcinogenic, toxic_dermis"
+Hexestrol,CID3606,CHEMBL6615,AUT;ITA;KWT;SAU;VEN,toxic_carcinogenic
+Alclofenac,CID30951,CHEMBL94081,CYP;DEU;DNK;GBR;GRC;IDN;IND;IRL;ITA;JOR;MAR;NZL,toxic_dermis
+Dihydroxymethylfuratrizine,CID6414792,,JPN;SAU;VEN,toxic_carcinogenic
+Plydexide sulfate,CID3085263,CHEMBL2107943,GBR,toxic_opthalmic
+Piperazine,CID4837,CHEMBL1412,ITA,carinogenicity
+Erythromycin estolate,CID71277,CHEMBL2220427,BGD;BHR;DNK;GRC;MUS;PER;SDN;SWE,toxic_hepa
+Buformin,CID2468,CHEMBL39736,BEL;CAN;DEU;GBR;USA,toxic_hema
+Phenformin,CID8249,CHEMBL170988,AUT;BRA;CAN;DEU;ETH;FIN;GBR;HKG;IRL;NLD;NOR;NZL;SAU;SWE;THAT;TUR;USA;YEM,toxic_hema
+Urethane,CID5641,CHEMBL462547,BRA;CAN;CUB;DEU;EGY;GBR;JPN;THA;USA;VEN,toxic_carcinogenic
+Oxeladin,CID4619,CHEMBL1500276,CAN;GBR;USA,toxic_carcinogenic
+Azaribine,CID16574,CHEMBL515914,MUS;SAU;THA;USA;VEN,toxic_hema
+Pifoxime,CID9570475,CHEMBL1998966,FRA,toxic_neuro
+Chloroform,CID6212,CHEMBL44618,BEL;BGD;BRA;DEU;ETH;GBR;IRL;JPN;NGA;NOR;OMN;PAN;PHL;SAU,toxic_carcinogenic
+Pyrithyldione,CID4994,CHEMBL1722501,GBR,toxic_systemic
+Clozapine,CID2818,CHEMBL42,USA;EU,toxic_hema
+Practolol,CID4883,CHEMBL6995,FIN;GRC;MUS;NZL;THA;TUR,toxic_dermis
+Mebanazine,CID6179,CHEMBL1909283,GBR,toxic_hepa
+Methiodal sodium,CID23662381,CHEMBL2106907,SWE,toxic_muscoskelet
+Phenacetin,CID4754,CHEMBL16073,Worldwide,"toxic_carcinogenic, toxic_nephro"
+Nialamide,CID4472,CHEMBL1256841,CUB;DNK;GBR;IND;JPN;THA;USA;VEN,toxic_hepa
+Isocarboxazid,CID3759,CHEMBL1201168,CUB;JPN;VEN,toxic_hepa
+Dipyrone,CID3111,CHEMBL461522,GBR; USA,toxic_hema
+Methamphetamine Hydrocloride,CID66124,CHEMBL1200952,USA,toxic_systemic
+Adenosine Phosphate,CID6083,CHEMBL752,USA,toxic_cardio
+Diethylstilbestrol,CID448537,CHEMBL411,ITA;PAN;SAU;TUN,toxic_teratogen
+Diamthazole,CID8708,CHEMBL1184360,FRA; USA,toxic_neuro
+Oxyphenisatine,CID31315,CHEMBL245807,AUS;DEU;FRA;GBR;USA,toxic_hepa
+Hexachlorophene,CID3598,CHEMBL496,JPN;PER;SUN;TUR,toxic_neuro
+Triacetyldiphenolisatin,CID29321,CHEMBL1909288,AUS;CAN;CYP;DEU;ITA;NZL;VEN,toxic_hepa
+Acetanilide,CID904,CHEMBL269644,JPN,toxic_hema
+Chlormadinone,CID5284533,CHEMBL1697830,GBR;USA,toxic_carcinogenic
+Fenclozic acid,CID28858,CHEMBL1909282,GBR; USA,toxic_hepa
+Mepazine Hydrochloride,CID102907,CHEMBL395110,USA,toxic_neuro
+Clioquinol,CID2788,CHEMBL497,Worldwide,toxic_neuro
+Amoproxan,CID31473,CHEMBL2104537,FRA,"toxic_dermis, toxic_opthalmic"
+Dihydrostreptomycin,CID439369,CHEMBL1950576,DOM;ITA;PHL;USA,toxic_neuro
+Sulfathiazole,CID5340,CHEMBL437,DOM;PHL;USA,toxic_hepa
+Oxyphenisatin acetate,CID8269,CHEMBL1402684,Worldwide,toxic_hepa
+Aminopyrine,CID6009,CHEMBL288470,USA,toxic_nephro
+Cloforex,CID26602,CHEMBL1697686,DEU;FRA;SWE;VEN,toxic_cardio
+Anagestone acetate,CID70693507,CHEMBL2104489,AUT;DEU;KWT,toxic_carcinogenic
+Megestrol Acetate,CID11683,CHEMBL1201139,FRA,toxic_carcinogenic
+Chlorphentermine,CID10007,CHEMBL1201269,DEU;VEN,toxic_cardio
+Pipamazine,CID6761,CHEMBL1909072,USA,toxic_hepa
+Ibufenac,CID15250,CHEMBL341812,GBR,toxic_hepa
+Aminorex Fumarate,CID16630,CHEMBL106258,CHE,"toxic_respiratory, toxic_cardio"
+Bithionol,CID2406,CHEMBL290106,JPN;USA,toxic_dermis
+Sulfadimethoxine,CID5323,CHEMBL62193,USA,toxic_dermis
+Phenoxypropazine,CID71467,CHEMBL1909286,GBR,toxic_hepa
+Aminoglutethimide,CID2145,CHEMBL488,SAU;USA,toxic_systemic
+Xenazoic acid,CID239062,CHEMBL1909289,BEL;FRA;VEN,toxic_hepa
+Pronetalol,CID4930,CHEMBL16476,GBR,toxic_carcinogenic
+Methopholine,CID16538,CHEMBL2106915,USA,toxic_opthalmic
+Butamben,CID2482,CHEMBL127516,USA,toxic_dermis
+Dithiazanine iodide,CID5702697,CHEMBL421701,CUB;FRA;ITA;TCD;USA,toxic_cardio
+Chlornaphazine,CID10307,CHEMBL2107519,Worldwide,toxic_carcinogenic
+Benziodarone,CID6237,CHEMBL232201,ESP;FRA;GBR,toxic_hepa
+Bunamiodyl,CID6436657,CHEMBL2110636,CAN;GBR;USA;VEN,toxic_nephro
+Danthron,CID2950,CHEMBL53418,CAN;DEU;GBR;NOR;SGP;USA,toxic_carcinogenic
+Triparanol,CID6536,CHEMBL187709,FRA;USA,toxic_opthalmic
+Thalidomide,CID5426,CHEMBL468,BRA;CAN;DEU;DNK;FIN;VEN,toxic_teratogen
+Sorivudine,CID5282192,CHEMBL70046,JPN,toxic_hema
+Thenalidine,CID27901,CHEMBL2105458,AUS;CAN;CYP;FIN;FRA;GBR;NOR;SWE;USA;VEN,toxic_hema
+Diiododiethyltin,CID76000,,FRA,toxic_neuro
+Carmofur,CID2577,CHEMBL460499,N/A,toxic_neuro
+Etifoxine,CID30768,CHEMBL2106227,N/A,toxic_hepa
+Flubendazole,CID35802,CHEMBL1454946,N/A,toxic_teratogen
+Flumequine,CID3374,CHEMBL370252,N/A,toxic_carcinogenic
+Flurothyl,CID9528,CHEMBL477874,N/A,toxic_neuro
+Fominoben,CID3407,CHEMBL1697837,N/A,toxic_teratogen
+Benzydamine Hydrochloride,CID65464,CHEMBL1528134,N/A,toxic_opthalmic
+Iodamide,CID3723,CHEMBL1201239,USA,toxic_neuro
+Cephaloridine,CID5773,CHEMBL316157,N/A,toxic_nephro
