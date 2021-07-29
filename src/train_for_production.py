@@ -253,6 +253,13 @@ def main(train_data, withdrawn_col, batch_size, gpu):
             reduce_lr=conf.reduce_lr,
         )
 
+        model_checkpoint = ModelCheckpoint(
+                dirpath=(logger.log_dir + '/checkpoint/'),
+                monitor='val_ap_epoch',
+                mode='max',
+                save_top_k=1,
+        )
+
         print("Starting training")
         trainer = pl.Trainer(
             max_epochs=conf.epochs,
@@ -260,13 +267,7 @@ def main(train_data, withdrawn_col, batch_size, gpu):
             logger=logger,
             resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
             weights_summary='top',
-            callbacks=[early_stop_callback],
-            checkpoint_callback=ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-            ),
+            callbacks=[early_stop_callback, model_checkpoint],
             deterministic=True,
             auto_lr_find=False,
             num_sanity_val_steps=0
