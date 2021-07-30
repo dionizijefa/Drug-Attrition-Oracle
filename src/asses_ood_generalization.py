@@ -223,9 +223,10 @@ def main(train_data, train_set, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
+    data = pd.read_csv(root / 'data/{}'.format(train_data))
+    data = data.sample(frac=1, random_state=0)
+
     if train_set == 'chembl':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.sample(frac=1, random_state=0)
         ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
         data = data.loc[(data['dataset'] == 'chembl') |
@@ -236,8 +237,6 @@ def main(train_data, train_set, batch_size, gpu):
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
 
     if train_set == 'drugbank':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.sample(frac=1, random_state=0)
         ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
         data = data.loc[(data['dataset'] == 'drugbank') |
@@ -248,8 +247,6 @@ def main(train_data, train_set, batch_size, gpu):
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
 
     if train_set == 'wd_db':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.sample(frac=1, random_state=0)
         ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
         data = data.loc[(data['dataset'] == 'drugbank') |
@@ -260,8 +257,6 @@ def main(train_data, train_set, batch_size, gpu):
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
 
     if train_set == 'wd_chembl':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.sample(frac=1, random_state=0)
         ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
         data = data.loc[(data['dataset'] == 'chembl') |
