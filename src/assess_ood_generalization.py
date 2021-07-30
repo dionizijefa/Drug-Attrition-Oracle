@@ -362,7 +362,6 @@ def main(train_data, train_set, batch_size, gpu):
             test_auc = round(results[0]['test_auc'], 3)
             cv_fold.append(k)
 
-
             X_ood_1, y_ood_1 = load_data_from_smiles(ood_1['smiles'], ood_1['withdrawn'])
             ood_1_dataset = construct_dataset(X_ood_1, y_ood_1)
             ood_1_loader = DataLoader(ood_1_dataset, collate_fn=mol_collate_func, num_workers=0,
