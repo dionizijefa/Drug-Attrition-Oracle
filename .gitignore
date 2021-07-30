@@ -4,3 +4,4 @@
 /data/chembl_0_full.csv
 /data/chembl_0_smiles.csv
 /data/.ipynb_checkpoints/combine_chembl_drugbank-checkpoint.ipynb
+/src/models/transformer_net/
