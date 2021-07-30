@@ -226,15 +226,23 @@ def main(train_data, train_set, batch_size, gpu):
     data = pd.read_csv(root / 'data/{}'.format(train_data))
     data = data.sample(frac=1, random_state=0)
 
+
     if train_set == 'chembl':
         ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
         data = data.loc[(data['dataset'] == 'chembl') |
                         (data['dataset'] == 'both')][['smiles', 'chembl_withdrawn']]
 
+
+
         data.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
         ood_1.rename(columns={'drugbank_withdrawn': 'withdrawn'}, inplace=True)
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
+
+        # fix columns dtypes since some contain 'missing' strings
+        data['withdrawn'] = data['withdrawn'].astype(int)
+        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
+        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
 
     if train_set == 'drugbank':
         ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
@@ -246,6 +254,10 @@ def main(train_data, train_set, batch_size, gpu):
         ood_1.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
 
+        data['withdrawn'] = data['withdrawn'].astype(int)
+        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
+        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
+
     if train_set == 'wd_db':
         ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
@@ -256,6 +268,10 @@ def main(train_data, train_set, batch_size, gpu):
         ood_1.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
 
+        data['withdrawn'] = data['withdrawn'].astype(int)
+        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
+        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
+
     if train_set == 'wd_chembl':
         ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
         ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
@@ -265,6 +281,10 @@ def main(train_data, train_set, batch_size, gpu):
         data.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
         ood_1.rename(columns={'drugbank_withdrawn': 'withdrawn'}, inplace=True)
         ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
+
+        data['withdrawn'] = data['withdrawn'].astype(int)
+        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
+        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
@@ -302,8 +322,6 @@ def main(train_data, train_set, batch_size, gpu):
                                                      train_data.iloc[train_index_2]['withdrawn'],
                                                      one_hot_formal_charge=True)
 
-            print(X_train[0])
-            print(error)
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
