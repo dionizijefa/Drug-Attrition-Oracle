@@ -84,7 +84,7 @@ def load_data_from_smiles(x_smiles, labels, add_dummy_node=True, one_hot_formal_
             mol = MolFromSmiles(smiles)
             try:
                 mol = Chem.AddHs(mol)
-                AllChem.EmbedMolecule(mol, maxAttempts=1)
+                AllChem.EmbedMolecule(mol, maxAttempts=5000)
                 AllChem.UFFOptimizeMolecule(mol)
                 mol = Chem.RemoveHs(mol)
             except:
