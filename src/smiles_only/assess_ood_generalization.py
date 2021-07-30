@@ -364,7 +364,8 @@ def main(train_data, train_set, batch_size, gpu):
 
             results_2 = trainer.test(model, test_loader)
 
-            X_ood_1, y_ood_1 = load_data_from_smiles(ood_1['smiles'], ood_1['withdrawn'])
+            X_ood_1, y_ood_1 = load_data_from_smiles(ood_1['smiles'], ood_1['withdrawn'],
+                                                     one_hot_formal_charge=True)
             ood_1_dataset = construct_dataset(X_ood_1, y_ood_1)
             ood_1_loader = DataLoader(ood_1_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
@@ -373,7 +374,8 @@ def main(train_data, train_set, batch_size, gpu):
             ood_1_ap_result = round(results_ood_1[0]['test_ap'], 3)
             ood_1_auc_result = round(results_ood_1[0]['test_auc'], 3)
 
-            X_ood_2, y_ood_2 = load_data_from_smiles(ood_2['smiles'], ood_2['withdrawn'])
+            X_ood_2, y_ood_2 = load_data_from_smiles(ood_2['smiles'], ood_2['withdrawn'],
+                                                     one_hot_formal_charge=True)
             ood_2_dataset = construct_dataset(X_ood_2, y_ood_2)
             ood_2_loader = DataLoader(ood_2_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)

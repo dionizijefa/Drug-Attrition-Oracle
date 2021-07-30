@@ -27,7 +27,7 @@ class MolDataset(Dataset):
         return sample
 
 
-class CreateDataset(Dataset):
+class MoleculesDataset(Dataset):
     def __init__(self, csv_file, withdrawn_col, descriptors_from_col):
         self.data = pd.read_csv(csv_file, index_col=0)
         self.labels = self.data[withdrawn_col]
@@ -39,6 +39,13 @@ class CreateDataset(Dataset):
         self.direction = {BD.NONE: 0, BD.BEGINWEDGE: 1, BD.BEGINDASH: 2,
                      BD.ENDDOWNRIGHT: 3, BD.ENDUPRIGHT: 4, BD.EITHERDOUBLE: 5,
                      BD.UNKNOWN: 6}
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        return sample
 
     def process(self):
         data_list = []
