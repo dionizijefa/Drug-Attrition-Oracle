@@ -6,7 +6,6 @@ from pprint import pformat
 from time import time
 from typing import Dict, Optional
 import pytorch_lightning as pl
-import torch
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.metrics.functional import average_precision, auroc
@@ -14,15 +13,16 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import torch
-from featurization.data_utils import load_data_from_df, construct_loader
 from transformer import Network
-from sklearn.metrics import f1_score
 from dataset import MolDataset, mol_collate_func
+import click
+import pandas as pd
+import numpy as np
 
 root = Path(__file__).resolve().parents[2].absolute()
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass()
 class Conf:
     gpus: int = 2
     seed: int = 42
@@ -33,6 +33,7 @@ class Conf:
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
+    pos_weight: torch.Tensor = torch.Tensor([8])
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -47,7 +48,6 @@ class Conf:
 
     def __str__(self):
         return pformat(dataclasses.asdict(self))
-
 
 
 class TransformerNet(pl.LightningModule, ABC):
@@ -78,8 +78,8 @@ class TransformerNet(pl.LightningModule, ABC):
                  metrics.get("loss"),
                  prog_bar=False, on_step=False)
         self.log('val_loss_epoch',
-                  metrics.get("loss"),
-                  on_step=False, on_epoch=True, prog_bar=False)
+                 metrics.get("loss"),
+                 on_step=False, on_epoch=True, prog_bar=False)
         return {
             "predictions": metrics.get("predictions"),
             "targets": metrics.get("targets"),
@@ -126,7 +126,8 @@ class TransformerNet(pl.LightningModule, ABC):
         names = batch[1]
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix, descriptors).squeeze(-1)
-        loss_fn = torch.nn.BCEWithLogitsLoss()
+        pos_weight = self.hparams.pos_weight.to("cuda")
+        loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, labels)
 
         return {
@@ -163,35 +164,18 @@ class TransformerNet(pl.LightningModule, ABC):
         items["v_num"] = version
         return items
 
-    def train_dataloader(self):
-        dataset = MolDataset('/home/dfa/AI4EU-group/AI4EU-descriptors/train_bono3.pt')
-        class_sample_count = [1565, 169]  # 169, 1565
-        weights = 1 / torch.Tensor(class_sample_count)
-        samples_weights = weights[dataset.labels]
-        sampler = WeightedRandomSampler(samples_weights,
-                                        num_samples=len(samples_weights),
-                                        replacement=True)
-        return DataLoader(dataset, self.hparams.batch_size, collate_fn=mol_collate_func, sampler=sampler)
-
-    def val_dataloader(self):
-        dataset = MolDataset('/home/dfa/AI4EU-group/AI4EU-descriptors/val_bono3.pt')
-        return DataLoader(dataset, self.hparams.batch_size, collate_fn=mol_collate_func)
-
-    def test_dataloader(self):
-        dataset = MolDataset('/home/dfa/AI4EU-group/AI4EU-descriptors/test_bono3.pt')
-        return DataLoader(dataset, self.hparams.batch_size, collate_fn=mol_collate_func)
-
-def main():
+@click.command()
+@click.option('-train_data')
+@click.option('-withdrawn_col')
+@click.option('-batch_size')
+@click.option('-descriptors_from')
+@click.option('--gpu')
+def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
     conf = Conf(
-        lr=1e-5,
-        batch_size=4,
-        epochs=300,
+        lr=1e-4,
+        batch_size=batch_size,
+        epochs=100,
         reduce_lr=True,
-    )
-
-    model = TransformerNet(
-        conf.to_hparams(),
-        reduce_lr=conf.reduce_lr,
     )
 
     logger = TensorBoardLogger(
@@ -208,46 +192,111 @@ def main():
     early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                         min_delta=0.00,
                                         mode='max',
-                                        patience=25,
+                                        patience=15,
                                         verbose=False)
 
-    print("Starting training")
-    trainer = pl.Trainer(
-        max_epochs=conf.epochs,
-        gpus=[1],  # [0]
-        logger=logger,
-        resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
-        weights_summary='top',
-        callbacks=[early_stop_callback],
-        checkpoint_callback=ModelCheckpoint(
-            dirpath=(logger.log_dir + '/checkpoint/'),
-            monitor='val_ap_epoch',
-            mode='max',
-            save_top_k=1,
-        ),
-        deterministic=True,
-        auto_lr_find=False,
-        num_sanity_val_steps=0,
-    )
-    trainer.fit(model)
-    results = trainer.test()
-    results_path = Path(root / "results")
-    test_ap = round(results[0]['test_ap'], 3)
-    test_auc = round(results[0]['test_auc'], 3)
-    if not results_path.exists():
-        results_path.mkdir(exist_ok=True, parents=True)
-        with open(results_path / "classification_results.txt", "w") as file:
-            file.write("Classification results")
-            file.write("\n")
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+    data = data.sample(frac=1, random_state=0)
 
-    results = {'Test AP': test_ap,
-               'Test AUC-ROC': test_auc,
-               }
-    version = {'version': logger.version}
-    results = {logger.name: [results, version]}
-    with open(results_path / "classification_results.txt", "a") as file:
-        print(results, file=file)
-        file.write("\n")
+    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
+
+    fold_ap = []
+    fold_auc_roc = []
+    cv_fold = []
+
+    for k, (train_index, test_index) in enumerate(
+            train_test_splitter.split(data, data[withdrawn_col])
+    ):
+        X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
+                                               data.iloc[test_index][withdrawn_col],
+                                               one_hot_formal_charge=True)
+        test_dataset = construct_dataset(X_test, y_test)
+        test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
+
+        train_data = data.iloc[train_index]
+
+        for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
+            X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
+                                                 train_data.iloc[val_index][withdrawn_col],
+                                                 one_hot_formal_charge=True)
+            val_dataset = construct_dataset(X_val, y_val)
+            val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
+
+            X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
+                                                     train_data.iloc[train_index_2][withdrawn_col],
+                                                     one_hot_formal_charge=True)
+            train_dataset = construct_dataset(X_train, y_train)
+            train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
+                                      batch_size=conf.batch_size)
+
+            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
+                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
+
+            conf.pos_weight = pos_weight
+
+            model = TransformerNet(
+                conf.to_hparams(),
+                reduce_lr=conf.reduce_lr,
+            )
+
+            print("Starting training")
+            trainer = pl.Trainer(
+                max_epochs=conf.epochs,
+                gpus=[gpu],  # [0]
+                logger=logger,
+                resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
+                weights_summary='top',
+                callbacks=[early_stop_callback],
+                checkpoint_callback=ModelCheckpoint(
+                    dirpath=(logger.log_dir + '/checkpoint/'),
+                    monitor='val_ap_epoch',
+                    mode='max',
+                    save_top_k=1,
+                ),
+                deterministic=True,
+                auto_lr_find=False,
+                num_sanity_val_steps=0
+            )
+
+            trainer.fit(model, train_loader, val_loader)
+            results = trainer.test(model, test_loader)
+            results_path = Path(root / "results")
+            test_ap = round(results[0]['test_ap'], 3)
+            test_auc = round(results[0]['test_auc'], 3)
+            cv_fold.append(k)
+
+            fold_ap.append(test_ap)
+            fold_auc_roc.append(test_auc)
+
+            if not results_path.exists():
+                results_path.mkdir(exist_ok=True, parents=True)
+                with open(results_path / "descriptors_classification_results.txt", "w") as file:
+                    file.write("Descriptors Classification results")
+                    file.write("\n")
+
+            results = {'Test AP': test_ap,
+                       'Test AUC-ROC': test_auc,
+                       'CV_fold': cv_fold}
+            version = {'version': logger.version}
+            results = {logger.name: [results, version]}
+            with open(results_path / "descriptors_classification_results.txt", "a") as file:
+                print(results, file=file)
+                file.write("\n")
+
+    print('Average AP across folds: {}'.format(np.mean(fold_ap)))
+    print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
+    print('\n')
+
+    for i, result in enumerate(fold_ap):
+        print('AP for fold {}= {}'.format(i, result))
+
+    for i, result in enumerate(fold_auc_roc):
+        print('AUC for fold {}= {}'.format(i, result))
+
+    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
+        results_path / "{}_metrics.csv".format(logger.version))
+
 
 if __name__ == '__main__':
     main()

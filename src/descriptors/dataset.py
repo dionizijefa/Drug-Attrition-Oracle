@@ -28,9 +28,10 @@ class MolDataset(Dataset):
 
 
 class CreateDataset(Dataset):
-    def __init__(self, csv_file):
+    def __init__(self, csv_file, withdrawn_col, descriptors_from_col):
         self.data = pd.read_csv(csv_file, index_col=0)
-        self.labels = self.data['label']
+        self.labels = self.data[withdrawn_col]
+        self.descriptors_from_col = descriptors_from_col
 
         self.bonds = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
         self.stereo = {BS.STEREONONE: 0, BS.STEREOANY: 1, BS.STEREOZ: 2,
@@ -39,12 +40,12 @@ class CreateDataset(Dataset):
                      BD.ENDDOWNRIGHT: 3, BD.ENDUPRIGHT: 4, BD.EITHERDOUBLE: 5,
                      BD.UNKNOWN: 6}
 
-    def process(self, output_name):
+    def process(self):
         data_list = []
         for i, molecule in tqdm(self.data.iterrows()):
             name = molecule['DrugBank ID']
             smiles = molecule['full_smiles']
-            mol = Chem.MolFromSmiles(smiles)  # there are multiple returned values
+            mol = Chem.MolFromSmiles(smiles)
             label = molecule['label']
 
             """ Features """
@@ -136,13 +137,9 @@ class CreateDataset(Dataset):
                 end_atom = bond.GetEndAtom().GetIdx()
                 adj_matrix[begin_atom, end_atom] = adj_matrix[end_atom, begin_atom] = 1
 
-            descriptors = molecule[5:].values.astype(float)
+            descriptors = molecule[self.descriptors_from_col].values.astype(float)
             data_list.append([x, adj_matrix, dist_matrix, descriptors, label, name])
 
-        torch.save(
-            data_list,
-            '/home/dionizije/jane/AI4EU-group/AI4EU-descriptors/{}.pt'.format(output_name)
-        )
         return data_list
 
 def pad_array(array, shape, dtype=np.float32):
