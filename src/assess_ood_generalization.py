@@ -301,6 +301,9 @@ def main(train_data, train_set, batch_size, gpu):
             X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
                                                      train_data.iloc[train_index_2]['withdrawn'],
                                                      one_hot_formal_charge=True)
+
+            print(X_train[0])
+            print(error)
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
