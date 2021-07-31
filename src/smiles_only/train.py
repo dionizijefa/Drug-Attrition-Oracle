@@ -199,7 +199,7 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
-@click.option('--gpu', default=1)
+@click.option('-gpu', default=1)
 def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
