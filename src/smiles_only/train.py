@@ -22,7 +22,7 @@ from featurization.data_utils import load_data_from_df, construct_dataset, load_
 from transformer import make_model
 import click
 
-root = Path(__file__).resolve().parents[3].absolute()
+root = Path(__file__).resolve().parents[2].absolute()
 
 
 @dataclasses.dataclass(
