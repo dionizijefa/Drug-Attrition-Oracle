@@ -196,10 +196,11 @@ class TransformerNet(pl.LightningModule, ABC):
 
 @click.command()
 @click.option('-train_data', default='chembl_4_smiles.csv')
+@click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
 @click.option('--gpu', default=1)
-def main(train_data, withdrawn_col, batch_size, gpu):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -224,8 +225,14 @@ def main(train_data, withdrawn_col, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
-    data = data.sample(frac=1, random_state=0)
+    if dataset == 'all':
+        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+        data = data.sample(frac=1, random_state=0)
+
+    if dataset == 'chembl':
+        data = pd.read_csv(root / 'data/{}'.format(train_data))
+        data = data.loc[data['dataset'] == 'chembl'][['smiles', withdrawn_col]]
+        data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
