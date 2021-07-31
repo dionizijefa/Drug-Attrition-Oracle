@@ -231,7 +231,9 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
     else:
         data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.loc[data['dataset'] == dataset][['smiles', withdrawn_col]]
+        data = data.loc[(data['dataset'] == dataset) |
+                        (data['dataset'] == 'both') |
+                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
         data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
