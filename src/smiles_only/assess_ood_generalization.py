@@ -21,7 +21,7 @@ from featurization.data_utils import load_data_from_df, construct_dataset, load_
 from transformer import make_model
 import click
 
-root = Path(__file__).resolve().parents[1].absolute()
+root = Path(__file__).resolve().parents[2].absolute()
 
 
 @dataclasses.dataclass(
@@ -362,8 +362,6 @@ def main(train_data, train_set, batch_size, gpu):
             test_auc = round(results[0]['test_auc'], 3)
             cv_fold.append(k)
 
-            results_2 = trainer.test(model, test_loader)
-
             X_ood_1, y_ood_1 = load_data_from_smiles(ood_1['smiles'], ood_1['withdrawn'],
                                                      one_hot_formal_charge=True)
             ood_1_dataset = construct_dataset(X_ood_1, y_ood_1)
@@ -374,21 +372,8 @@ def main(train_data, train_set, batch_size, gpu):
             ood_1_ap_result = round(results_ood_1[0]['test_ap'], 3)
             ood_1_auc_result = round(results_ood_1[0]['test_auc'], 3)
 
-            X_ood_2, y_ood_2 = load_data_from_smiles(ood_2['smiles'], ood_2['withdrawn'],
-                                                     one_hot_formal_charge=True)
-            ood_2_dataset = construct_dataset(X_ood_2, y_ood_2)
-            ood_2_loader = DataLoader(ood_2_dataset, collate_fn=mol_collate_func, num_workers=0,
-                                      batch_size=conf.batch_size)
-
-            results_ood_2 = trainer.test(model, ood_2_loader)
-            ood_2_ap_result = round(results_ood_2[0]['test_ap'], 3)
-            ood_2_auc_result = round(results_ood_2[0]['test_auc'], 3)
-
             ood_1_ap.append(ood_1_ap_result)
             ood_1_auc_roc.append(ood_1_auc_result)
-
-            ood_2_ap.append(ood_2_ap_result)
-            ood_2_auc_roc.append(ood_2_auc_result)
 
             ood_1_prior_fold = ood_1['withdrawn'].value_counts()[1] / (
                 ood_1['withdrawn'].value_counts()[1] + ood_1['withdrawn'].value_counts()[0]
@@ -412,8 +397,7 @@ def main(train_data, train_set, batch_size, gpu):
                        'ood_1_ap': ood_1_ap_result,
                        'ood_1_auc': ood_1_auc_result,
                        'ood_1_prior': ood_1_prior_fold,
-                       'withdrawn_ap': ood_2_ap_result,
-                       'withdrawn_auc': ood_2_auc_result}
+                       }
             version = {'version': logger.version}
             results = {logger.name: [results, version]}
             with open(results_path / "classification_results_ood.txt", "a") as file:
@@ -428,15 +412,9 @@ def main(train_data, train_set, batch_size, gpu):
     print('Average ood_1 AUC across folds: {}'.format(np.mean(ood_1_auc_roc)))
     print('Prior probability of ood_1: {}'.format(np.mean(ood_1_prior)))
 
-    print('\n')
-    print('Average ood_2 AP across folds: {}'.format(np.mean(ood_2_ap)))
-    print('Average ood_2 AUC across folds: {}'.format(np.mean(ood_2_auc_roc)))
-    print('Prior probability of ood_1: 1')
-
-
     results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc,
                                'ood_1_prior': ood_1_prior, 'ood_1_AP': ood_1_ap, 'ood_1_AUC': ood_1_auc_roc,
-                               'ood_2_AP': ood_2_ap, 'ood_2_AUC': ood_2_auc_roc}).to_csv(
+                               }).to_csv(
         results_path / "{}_ood_metrics.csv".format(logger.version))
 
 
