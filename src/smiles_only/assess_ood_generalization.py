@@ -381,7 +381,6 @@ def main(train_data, train_set, batch_size, gpu):
 
             ood_1_prior.append(ood_1_prior_fold)
 
-
             fold_ap.append(test_ap)
             fold_auc_roc.append(test_auc)
 
