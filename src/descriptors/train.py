@@ -15,7 +15,7 @@ from torch.optim import Adam
 import torch
 from torch.utils.data import DataLoader
 from transformer import Network
-from descriptors.dataset import MoleculesDataset, mol_collate_func
+from dataset import MoleculesDataset, mol_collate_func
 import click
 import pandas as pd
 import numpy as np
@@ -169,7 +169,7 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-withdrawn_col')
 @click.option('-batch_size')
 @click.option('-descriptors_from')
-@click.option('--gpu')
+@click.option('-gpu')
 def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
     conf = Conf(
         lr=1e-4,

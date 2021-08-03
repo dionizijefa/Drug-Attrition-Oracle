@@ -83,7 +83,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pretrained_name = root / 'pretrained_weights.pt'
         pretrained_state_dict = torch.load(pretrained_name)
         pl.seed_everything(hparams['seed'])
-
+            
         model_state_dict = self.model.state_dict()
         for name, param in pretrained_state_dict.items():
             if 'generator' in name:
