@@ -12,10 +12,10 @@ from pytorch_lightning.metrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
-from torch.utils.data import DataLoader, WeightedRandomSampler
 import torch
+from torch.utils.data import DataLoader
 from transformer import Network
-from dataset import MolDataset, mol_collate_func
+from descriptors.dataset import MoleculesDataset, mol_collate_func
 import click
 import pandas as pd
 import numpy as np
@@ -123,8 +123,7 @@ class TransformerNet(pl.LightningModule, ABC):
         self.log_dict(log_metrics)
 
     def shared_step(self, batch, batchidx):
-        adjacency_matrix, node_features, distance_matrix, descriptors, labels = batch[0]
-        names = batch[1]
+        adjacency_matrix, node_features, distance_matrix, descriptors, labels = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix, descriptors).squeeze(-1)
         pos_weight = self.hparams.pos_weight.to("cuda")
@@ -196,7 +195,7 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/{}'.format(train_data))
+    data = pd.read_csv(root / 'data/descriptors/datasets/{}'.format(train_data))
     data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
@@ -210,18 +209,33 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
             train_test_splitter.split(data, data[withdrawn_col])
     ):
         test_data = data.iloc[test_index]
+        test_data = MoleculesDataset(test_data, withdrawn_col, descriptors_from)
+        test_loader = DataLoader(test_data,
+                                 num_workers=0,
+                                 collate_fn=mol_collate_func,
+                                 batch_size=conf.batch_size)
+
         train_data = data.iloc[train_index]
 
         for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
             val_data = train_data.iloc[val_index]
             train_data = train_data.iloc[train_index_2]
 
+            val_data = MoleculesDataset(val_data, withdrawn_col, descriptors_from)
+            val_loader = DataLoader(val_data,
+                                    num_workers=0,
+                                    collate_fn=mol_collate_func,
+                                    batch_size=conf.batch_size)
+
             pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
                                         train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
             conf.pos_weight = pos_weight
 
-
-
+            train_data = MoleculesDataset(train_data, withdrawn_col, descriptors_from)
+            train_loader = DataLoader(train_data,
+                                      num_workers=0,
+                                      collate_fn=mol_collate_func,
+                                      batch_size=conf.batch_size)
 
             model = TransformerNet(
                 conf.to_hparams(),

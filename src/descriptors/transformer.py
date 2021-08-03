@@ -15,8 +15,8 @@ class Network(torch.nn.Module):
         super(Network, self).__init__()
         self.MAT = MAT(
             dim_in=11,
-            model_dim=512,
-            dim_out=128,
+            model_dim=1024,
+            dim_out=1,
             depth=8,
             Lg=0.33,  # lambda (g)raph - weight for adjacency matrix
             Ld=0.33,  # lambda (d)istance - weight for distance matrix
@@ -30,10 +30,7 @@ class Network(torch.nn.Module):
                      adjacency_mat=adj_mat,
                      distance_mat=dist_mat,
                      mask=mask)
-        #print(descriptors.size())
-        #descriptors = F.relu(self.descriptors_lin(descriptors))
         out = torch.cat((x, descriptors), dim=1)
-        #out = F.relu(self.linear_1(out))
         out = self.linear_2(out)
         return out
 

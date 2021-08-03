@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset
-import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.rdchem import HybridizationType
 from rdkit.Chem.rdchem import BondType as BT
@@ -13,6 +12,7 @@ from rdkit.Chem import AllChem
 import numpy as np
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
+
 
 class MolDataset(Dataset):
     def __init__(self, pt_file):
@@ -28,32 +28,33 @@ class MolDataset(Dataset):
 
 
 class MoleculesDataset(Dataset):
-    def __init__(self, csv_file, withdrawn_col, descriptors_from_col):
-        self.data = pd.read_csv(csv_file, index_col=0)
+    def __init__(self, data, withdrawn_col, descriptors_from_col):
+        self.data = data
         self.labels = self.data[withdrawn_col]
+        self.withdrawn_col = withdrawn_col
         self.descriptors_from_col = descriptors_from_col
 
         self.bonds = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
         self.stereo = {BS.STEREONONE: 0, BS.STEREOANY: 1, BS.STEREOZ: 2,
-                  BS.STEREOE: 3, BS.STEREOCIS: 4, BS.STEREOTRANS: 5}
+                       BS.STEREOE: 3, BS.STEREOCIS: 4, BS.STEREOTRANS: 5}
         self.direction = {BD.NONE: 0, BD.BEGINWEDGE: 1, BD.BEGINDASH: 2,
-                     BD.ENDDOWNRIGHT: 3, BD.ENDUPRIGHT: 4, BD.EITHERDOUBLE: 5,
-                     BD.UNKNOWN: 6}
+                          BD.ENDDOWNRIGHT: 3, BD.ENDUPRIGHT: 4, BD.EITHERDOUBLE: 5,
+                          BD.UNKNOWN: 6}
+        self.data_list = self.process()
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        sample = self.data[idx]
+        sample = self.data_list[idx]
         return sample
 
     def process(self):
         data_list = []
         for i, molecule in tqdm(self.data.iterrows()):
-            name = molecule['DrugBank ID']
-            smiles = molecule['full_smiles']
+            smiles = molecule['smiles']
             mol = Chem.MolFromSmiles(smiles)
-            label = molecule['label']
+            label = molecule[self.withdrawn_col]
 
             """ Features """
             atomic_number = []
@@ -144,10 +145,11 @@ class MoleculesDataset(Dataset):
                 end_atom = bond.GetEndAtom().GetIdx()
                 adj_matrix[begin_atom, end_atom] = adj_matrix[end_atom, begin_atom] = 1
 
-            descriptors = molecule[self.descriptors_from_col].values.astype(float)
-            data_list.append([x, adj_matrix, dist_matrix, descriptors, label, name])
+            descriptors = molecule[self.descriptors_from_col:].values.astype(float)
+            data_list.append([x, adj_matrix, dist_matrix, descriptors, label])
 
         return data_list
+
 
 def pad_array(array, shape, dtype=np.float32):
     """Pad a 2-dimensional array with zeros.
@@ -164,6 +166,7 @@ def pad_array(array, shape, dtype=np.float32):
     padded_array[:array.shape[0], :array.shape[1]] = array
     return padded_array
 
+
 def mol_collate_func(batch):
     """Create a padded batch of molecule features.
 
@@ -176,7 +179,6 @@ def mol_collate_func(batch):
     """
     adjacency_list, distance_list, features_list, descriptors_list = [], [], [], []
     labels = []
-    names = []
 
     max_size = 0
     for molecule in batch:
@@ -189,15 +191,9 @@ def mol_collate_func(batch):
         features_list.append(pad_array(molecule[0], (max_size, molecule[0].shape[1])))
         descriptors_list.append(molecule[3])
         labels.append(molecule[4])
-        names.append(molecule[5])
 
     data = [torch.Tensor(features) for features in (
         adjacency_list, features_list, distance_list, descriptors_list, labels
     )]
 
-    return [data, names]
-
-
-
-
-
+    return data
