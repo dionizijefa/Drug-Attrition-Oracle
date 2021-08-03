@@ -11,7 +11,7 @@ from molecule_attention_transformer import MAT
 class Network(torch.nn.Module):
     def __init__(
             self,
-            ppi_depth=3):
+            descriptors_len):
         super(Network, self).__init__()
         self.MAT = MAT(
             dim_in=11,
@@ -23,7 +23,7 @@ class Network(torch.nn.Module):
             La=1,  # lambda (a)ttention - weight for usual self-attention
             dist_kernel_fn='softmax'  # distance kernel fn - either 'exp' or 'softmax'
         )
-        self.linear_2 = torch.nn.Linear(321, 1)
+        self.linear_2 = torch.nn.Linear((descriptors_len+1), 1)
 
     def forward(self, x, mask, adj_mat, dist_mat, descriptors):
         x = self.MAT(x=x,

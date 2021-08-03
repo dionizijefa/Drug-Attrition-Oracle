@@ -198,6 +198,8 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
     data = pd.read_csv(root / 'data/descriptors/datasets/{}'.format(train_data))
     data = data.sample(frac=1, random_state=0)
 
+    descriptors_len = len(data.iloc[0][descriptors_from:])
+
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
@@ -240,6 +242,7 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
             model = TransformerNet(
                 conf.to_hparams(),
                 reduce_lr=conf.reduce_lr,
+                descriptors_len=descriptors_len
             )
 
             print("Starting training")
