@@ -55,12 +55,13 @@ class TransformerNet(pl.LightningModule, ABC):
     def __init__(
             self,
             hparams,
+            descriptors_len,
             reduce_lr: Optional[bool] = True,
     ):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model = Network()
+        self.model = Network(descriptors_len=descriptors_len)
         pl.seed_everything(hparams['seed'])
 
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix, descriptors):
@@ -124,11 +125,12 @@ class TransformerNet(pl.LightningModule, ABC):
 
     def shared_step(self, batch, batchidx):
         adjacency_matrix, node_features, distance_matrix, descriptors, labels = batch
+        labels = labels.int()
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix, descriptors).squeeze(-1)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        loss = loss_fn(y_hat, labels)
+        loss = loss_fn(y_hat, labels.float())
 
         return {
             'loss': loss,
@@ -167,9 +169,9 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.command()
 @click.option('-train_data')
 @click.option('-withdrawn_col')
-@click.option('-batch_size')
-@click.option('-descriptors_from')
-@click.option('-gpu')
+@click.option('-batch_size', type=int)
+@click.option('-descriptors_from', type=int)
+@click.option('-gpu', type=int)
 def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
     conf = Conf(
         lr=1e-4,
@@ -195,7 +197,7 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/descriptors/datasets/{}'.format(train_data))
+    data = pd.read_csv(root / 'data/descriptors_datasets/{}'.format(train_data), index_col=0)
     data = data.sample(frac=1, random_state=0)
 
     descriptors_len = len(data.iloc[0][descriptors_from:])
@@ -229,8 +231,8 @@ def main(train_data, withdrawn_col, batch_size, gpu, descriptors_from):
                                     collate_fn=mol_collate_func,
                                     batch_size=conf.batch_size)
 
-            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
-                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
+            pos_weight = torch.Tensor([(train_data[withdrawn_col].value_counts()[0] /
+                                        train_data[withdrawn_col].value_counts()[1])])
             conf.pos_weight = pos_weight
 
             train_data = MoleculesDataset(train_data, withdrawn_col, descriptors_from)
