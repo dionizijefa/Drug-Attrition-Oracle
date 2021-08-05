@@ -18,7 +18,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
-from src.smiles_only.data_utils import construct_dataset_multilabel, load_data_from_smiles, mol_collate_func
+from data_utils import construct_dataset_multilabel, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
 
@@ -29,6 +29,11 @@ root = Path(__file__).resolve().parents[2].absolute()
     #frozen=True
 )
 class Conf:
+    pos_weight_toxs: torch.Tensor = torch.Tensor(
+        [6.1926e-02, 5.2146e+00, 2.9651e+00, 1.6802e+01, 1.8903e+01, 7.2011e+00,
+        3.7806e+01, 6.5749e+00, 2.6073e+00, 7.9591e+00, 5.0407e+00, 3.0244e+01,
+        1.0081e+01, 3.7806e+01, 1.5122e+02, 1.5122e+02, 1.5122e+02, 1.5122e+02])
+    pos_weight: torch.Tensor = torch.Tensor([8])
     gpus: int = 1
     seed: int = 42
     use_16bit: bool = False
@@ -38,8 +43,6 @@ class Conf:
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
-    pos_weight: torch.Tensor = torch.Tensor([8])
-    pos_weight_toxs: torch.Tensor
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -147,14 +150,15 @@ class TransformerNet(pl.LightningModule, ABC):
         adjacency_matrix, node_features, distance_matrix, y, y2 = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
-        predictions = [self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)]
-        y_hat = predictions[0]
+        predictions = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+
+        y_hat = predictions[:,0].unsqueeze(dim=-1)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y)
 
-        tox_y = predictions[1:]
         pos_weight_toxs = self.hparams.pos_weight_toxs.to("cuda")
+        tox_y = predictions[:,1:]
         loss_fn_toxs = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_toxs)
         loss_toxs = loss_fn_toxs(tox_y, y2)
 
@@ -243,7 +247,13 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     fold_auc_roc = []
     cv_fold = []
 
-    tox_labels = LabelBinarizer().fit_transformer(data['Toxicty type'])
+    pos_weight_toxs = torch.Tensor(compute_class_weight(
+        classes=data['Toxicity type'].unique(),
+        y=data['Toxicity type'],
+        class_weight='balanced'
+    ))
+
+    tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
     for k, (train_index, test_index) in enumerate(
             train_test_splitter.split(data, data[withdrawn_col], data['Toxicity type'])
     ):
@@ -277,12 +287,6 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
             pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
                                         train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
-
-            pos_weight_toxs = torch.Tensor(compute_class_weight(
-                classes=train_data.iloc[train_index_2]['Toxicity type'].unique(),
-                y=train_data.iloc[train_index_2]['Toxicity type'],
-                class_weight='balanced'
-            ))
 
             conf.pos_weight = pos_weight
             conf.pos_weight_toxs = pos_weight_toxs
