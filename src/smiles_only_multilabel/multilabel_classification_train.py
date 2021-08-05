@@ -10,6 +10,8 @@ import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.utils import compute_class_weight
 from torchmetrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -37,6 +39,7 @@ class Conf:
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
     pos_weight: torch.Tensor = torch.Tensor([8])
+    pos_weight_toxs: torch.Tensor
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -75,7 +78,7 @@ class TransformerNet(pl.LightningModule, ABC):
             'distance_matrix_kernel': 'exp',
             'dropout': 0.0,
             'aggregation_type': 'mean',
-            'n_output': 2,
+            'n_output': 19,
         }
 
         self.model = make_model(**self.model_params)
@@ -144,10 +147,18 @@ class TransformerNet(pl.LightningModule, ABC):
         adjacency_matrix, node_features, distance_matrix, y, y2 = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
-        y_hat = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+        predictions = [self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)]
+        y_hat = predictions[0]
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y)
+
+        tox_y = predictions[1:]
+        pos_weight_toxs = self.hparams.pos_weight_toxs.to("cuda")
+        loss_fn_toxs = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_toxs)
+        loss_toxs = loss_fn_toxs(tox_y, y2)
+
+        loss = loss + loss_toxs
 
         return {
             'loss': loss,
@@ -215,14 +226,14 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                                         verbose=False)
 
     if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'withdrawn_toxicity']]
+        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'Toxicity type']]
         data = data.sample(frac=1, random_state=0)
 
     else:
         data = pd.read_csv(root / 'data/{}'.format(train_data))
         data = data.loc[(data['dataset'] == dataset) |
                         (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col, 'withdrawn_toxicity']]
+                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col, 'Toxicity type']]
         data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
@@ -232,10 +243,11 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     fold_auc_roc = []
     cv_fold = []
 
+    tox_labels = LabelBinarizer().fit_transformer(data['Toxicty type'])
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data[withdrawn_col])
+            train_test_splitter.split(data, data[withdrawn_col], data['Toxicity type'])
     ):
-        y2_test = data.iloc[test_index]['withdrawn_toxicity']
+        y2_test = tox_labels[test_index]
         X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
                                                data.iloc[test_index][withdrawn_col],
                                                one_hot_formal_charge=True)
@@ -243,19 +255,22 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
         train_data = data.iloc[train_index]
+        train_toxs = tox_labels[train_index]
 
-        for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
+        for train_index_2, val_index in train_val_splitter.split(
+                train_data, train_data[withdrawn_col], train_data['Toxicity type']
+        ):
             X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
                                                  train_data.iloc[val_index][withdrawn_col],
                                                  one_hot_formal_charge=True)
-            y2_val = train_data.iloc[val_index]['withdrawn_toxicity']
+            y2_val = train_toxs[val_index]
             val_dataset = construct_dataset_multilabel(X_val, y_val, y2_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
             X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
                                                      train_data.iloc[train_index_2][withdrawn_col],
                                                      one_hot_formal_charge=True)
-            y2_train = train_data.iloc[train_index]['withdrawn_toxicity']
+            y2_train = train_toxs[train_index_2]
             train_dataset = construct_dataset_multilabel(X_train, y_train, y2_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
@@ -263,7 +278,14 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
                                         train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
 
+            pos_weight_toxs = torch.Tensor(compute_class_weight(
+                classes=train_data.iloc[train_index_2]['Toxicity type'].unique(),
+                y=train_data.iloc[train_index_2]['Toxicity type'],
+                class_weight='balanced'
+            ))
+
             conf.pos_weight = pos_weight
+            conf.pos_weight_toxs = pos_weight_toxs
 
             model = TransformerNet(
                 conf.to_hparams(),
@@ -295,7 +317,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             test_ap = round(results[0]['test_ap'], 3)
             test_auc = round(results[0]['test_auc'], 3)
 
-            print(results1)
+            print(results)
             cv_fold.append(k)
 
             fold_ap.append(test_ap)

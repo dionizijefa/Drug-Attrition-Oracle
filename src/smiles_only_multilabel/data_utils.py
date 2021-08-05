@@ -154,11 +154,12 @@ class Molecule:
         - self.label: 0 neg, 1 pos -1 missing for different target.
     """
 
-    def __init__(self, x, y, index):
+    def __init__(self, x, y, y2, index):
         self.node_features = x[0]
         self.adjacency_matrix = x[1]
         self.distance_matrix = x[2]
         self.y = y
+        self.y2 = y2
         self.index = index
 
 
@@ -211,13 +212,16 @@ def mol_collate_func(batch):
     """
     adjacency_list, distance_list, features_list = [], [], []
     labels = []
+    labels_2 = []
 
     max_size = 0
     for molecule in batch:
         if type(molecule.y[0]) == np.ndarray:
             labels.append(molecule.y[0])
+            labels_2.append(molecule.y2)
         else:
             labels.append(molecule.y)
+            labels_2.append(molecule.y2)
         if molecule.adjacency_matrix.shape[0] > max_size:
             max_size = molecule.adjacency_matrix.shape[0]
 
@@ -226,7 +230,7 @@ def mol_collate_func(batch):
         distance_list.append(pad_array(molecule.distance_matrix, (max_size, max_size)))
         features_list.append(pad_array(molecule.node_features, (max_size, molecule.node_features.shape[1])))
 
-    return [FloatTensor(features) for features in (adjacency_list, features_list, distance_list, labels)]
+    return [FloatTensor(features) for features in (adjacency_list, features_list, distance_list, labels, labels_2)]
 
 
 def construct_dataset(x_all, y_all):
