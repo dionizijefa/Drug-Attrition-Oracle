@@ -23,47 +23,6 @@ LongTensor = torch.cuda.LongTensor if use_cuda else torch.LongTensor
 IntTensor = torch.cuda.IntTensor if use_cuda else torch.IntTensor
 DoubleTensor = torch.cuda.DoubleTensor if use_cuda else torch.DoubleTensor
 
-
-def load_data_from_df(dataset_path, add_dummy_node=True, one_hot_formal_charge=False, use_data_saving=True):
-    """Load and featurize data stored in a CSV file.
-
-    Args:
-        dataset_path (str): A path to the CSV file containing the data. It should have two columns:
-                            the first one contains SMILES strings of the compounds,
-                            the second one contains labels.
-        add_dummy_node (bool): If True, a dummy node will be added to the molecular graph. Defaults to True.
-        one_hot_formal_charge (bool): If True, formal charges on atoms are one-hot encoded. Defaults to False.
-        use_data_saving (bool): If True, saved features will be loaded from the dataset directory; if no feature file
-                                is present, the features will be saved after calculations. Defaults to True.
-
-    Returns:
-        A tuple (X, y) in which X is a list of graph descriptors (node features, adjacency matrices, distance matrices),
-        and y is a list of the corresponding labels.
-    """
-    feat_stamp = f'{"_dn" if add_dummy_node else ""}{"_ohfc" if one_hot_formal_charge else ""}'
-    feature_path = dataset_path.replace('.csv', f'{feat_stamp}.p')
-    if use_data_saving and os.path.exists(feature_path):
-        logging.info(f"Loading features stored at '{feature_path}'")
-        x_all, y_all = pickle.load(open(feature_path, "rb"))
-        return x_all, y_all
-
-    data_df = pd.read_csv(dataset_path)
-
-    data_x = data_df.iloc[:, 0].values
-    data_y = data_df.iloc[:, 1].values
-
-    if data_y.dtype == np.float64:
-        data_y = data_y.astype(np.float32)
-
-    x_all, y_all = load_data_from_smiles(data_x, data_y, add_dummy_node=add_dummy_node,
-                                         one_hot_formal_charge=one_hot_formal_charge)
-    if use_data_saving and not os.path.exists(feature_path):
-        logging.info(f"Saving features at '{feature_path}'")
-        pickle.dump((x_all, y_all), open(feature_path, "wb"))
-
-    return x_all, y_all
-
-
 def load_data_from_smiles(x_smiles, labels, add_dummy_node=True, one_hot_formal_charge=False):
     """Load and featurize data from lists of SMILES strings and labels.
 
@@ -84,7 +43,7 @@ def load_data_from_smiles(x_smiles, labels, add_dummy_node=True, one_hot_formal_
             mol = MolFromSmiles(smiles)
             try:
                 mol = Chem.AddHs(mol)
-                AllChem.EmbedMolecule(mol, maxAttempts=5000)
+                AllChem.EmbedMolecule(mol, maxAttempts=1)
                 AllChem.UFFOptimizeMolecule(mol)
                 mol = Chem.RemoveHs(mol)
             except:
@@ -285,21 +244,17 @@ def construct_dataset(x_all, y_all):
     return MolDataset(output)
 
 
-def construct_loader(x, y, batch_size, shuffle=True):
-    """Construct a data loader for the provided data.
+def construct_dataset_multilabel(x_all, y_all, y2_all):
+    """Construct a MolDataset object from the provided data.
 
     Args:
-        x (list): A list of molecule features.
-        y (list): A list of the corresponding labels.
-        batch_size (int): The batch size.
-        shuffle (bool): If True the data will be loaded in a random order. Defaults to True.
+        x_all (list): A list of molecule features.
+        y_all (list): A list of the corresponding labels.
+        y2_all (list): Second label
 
     Returns:
-        A DataLoader object that yields batches of padded molecule features.
+        A MolDataset object filled with the provided data.
     """
-    data_set = construct_dataset(x, y)
-    loader = torch.utils.data.DataLoader(dataset=data_set,
-                                         batch_size=batch_size,
-                                         collate_fn=mol_collate_func,
-                                         shuffle=shuffle)
-    return loader
+    output = [Molecule(data[0], data[1], data[2], i)
+              for i, data in enumerate(zip(x_all, y_all, y2_all))]
+    return MolDataset(output)

@@ -16,7 +16,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
-from featurization.data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
+from src.smiles_only.data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
 

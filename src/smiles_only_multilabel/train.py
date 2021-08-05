@@ -5,7 +5,6 @@ from pathlib import Path
 from pprint import pformat
 from time import time
 from typing import Dict, Optional
-
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -17,7 +16,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
-from src.smiles_only.data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
+from featurization.data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
 
@@ -82,7 +81,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pretrained_name = root / 'pretrained_weights.pt'
         pretrained_state_dict = torch.load(pretrained_name)
         pl.seed_everything(hparams['seed'])
-
+            
         model_state_dict = self.model.state_dict()
         for name, param in pretrained_state_dict.items():
             if 'generator' in name:
@@ -195,10 +194,11 @@ class TransformerNet(pl.LightningModule, ABC):
 
 @click.command()
 @click.option('-train_data', default='chembl_4_smiles.csv')
-@click.option('-train_set', default='chembl')
+@click.option('-dataset', default='all')
+@click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
-def main(train_data, train_set, batch_size, gpu):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -223,68 +223,16 @@ def main(train_data, train_set, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/{}'.format(train_data))
-    data = data.sample(frac=1, random_state=0)
+    if dataset == 'all':
+        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+        data = data.sample(frac=1, random_state=0)
 
-
-    if train_set == 'chembl':
-        ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
-        ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
-        data = data.loc[(data['dataset'] == 'chembl') |
-                        (data['dataset'] == 'both')][['smiles', 'chembl_withdrawn']]
-
-
-
-        data.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
-        ood_1.rename(columns={'drugbank_withdrawn': 'withdrawn'}, inplace=True)
-        ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-
-        # fix columns dtypes since some contain 'missing' strings
-        data['withdrawn'] = data['withdrawn'].astype(int)
-        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
-        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
-
-    if train_set == 'drugbank':
-        ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
-        ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
-        data = data.loc[(data['dataset'] == 'drugbank') |
-                        (data['dataset'] == 'both')][['smiles', 'drugbank_withdrawn']]
-
-        data.rename(columns={'drugbank_withdrawn': 'withdrawn'}, inplace=True)
-        ood_1.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
-        ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-
-        data['withdrawn'] = data['withdrawn'].astype(int)
-        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
-        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
-
-    if train_set == 'wd_db':
-        ood_1 = data.loc[(data['dataset'] == 'chembl')][['smiles', 'chembl_withdrawn']]
-        ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
-        data = data.loc[(data['dataset'] == 'drugbank') |
-                        (data['dataset'] == 'both')][['smiles', 'withdrawn_label']]
-
-        data.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-        ood_1.rename(columns={'chembl_withdrawn': 'withdrawn'}, inplace=True)
-        ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-
-        data['withdrawn'] = data['withdrawn'].astype(int)
-        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
-        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
-
-    if train_set == 'wd_chembl':
-        ood_1 = data.loc[(data['dataset'] == 'drugbank')][['smiles', 'drugbank_withdrawn']]
-        ood_2 = data.loc[(data['dataset'] == 'withdrawn')][['smiles', 'withdrawn_label']]
-        data = data.loc[(data['dataset'] == 'chembl') |
-                        (data['dataset'] == 'both')][['smiles', 'withdrawn_label']]
-
-        data.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-        ood_1.rename(columns={'drugbank_withdrawn': 'withdrawn'}, inplace=True)
-        ood_2.rename(columns={'withdrawn_label': 'withdrawn'}, inplace=True)
-
-        data['withdrawn'] = data['withdrawn'].astype(int)
-        ood_1['withdrawn'] = ood_1['withdrawn'].astype(int)
-        ood_2['withdrawn'] = ood_2['withdrawn'].astype(int)
+    else:
+        data = pd.read_csv(root / 'data/{}'.format(train_data))
+        data = data.loc[(data['dataset'] == dataset) |
+                        (data['dataset'] == 'both') |
+                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
+        data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
@@ -293,41 +241,33 @@ def main(train_data, train_set, batch_size, gpu):
     fold_auc_roc = []
     cv_fold = []
 
-    ood_1_prior = []
-    ood_1_ap = []
-    ood_1_auc_roc = []
-
-    ood_2_ap = []
-    ood_2_auc_roc = []
-
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data['withdrawn'])
+            train_test_splitter.split(data, data[withdrawn_col])
     ):
         X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
-                                               data.iloc[test_index]['withdrawn'],
+                                               data.iloc[test_index][withdrawn_col],
                                                one_hot_formal_charge=True)
         test_dataset = construct_dataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
         train_data = data.iloc[train_index]
 
-        for train_index_2, val_index in train_val_splitter.split(train_data, train_data['withdrawn']):
+        for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
             X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
-                                                 train_data.iloc[val_index]['withdrawn'],
+                                                 train_data.iloc[val_index][withdrawn_col],
                                                  one_hot_formal_charge=True)
             val_dataset = construct_dataset(X_val, y_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
             X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
-                                                     train_data.iloc[train_index_2]['withdrawn'],
+                                                     train_data.iloc[train_index_2][withdrawn_col],
                                                      one_hot_formal_charge=True)
-
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
 
-            pos_weight = torch.Tensor([(train_data.iloc[train_index_2]['withdrawn'].value_counts()[0] /
-                                        train_data.iloc[train_index_2]['withdrawn'].value_counts()[1])])
+            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
+                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
 
             conf.pos_weight = pos_weight
 
@@ -362,44 +302,21 @@ def main(train_data, train_set, batch_size, gpu):
             test_auc = round(results[0]['test_auc'], 3)
             cv_fold.append(k)
 
-            X_ood_1, y_ood_1 = load_data_from_smiles(ood_1['smiles'], ood_1['withdrawn'],
-                                                     one_hot_formal_charge=True)
-            ood_1_dataset = construct_dataset(X_ood_1, y_ood_1)
-            ood_1_loader = DataLoader(ood_1_dataset, collate_fn=mol_collate_func, num_workers=0,
-                                      batch_size=conf.batch_size)
-
-            results_ood_1 = trainer.test(model, ood_1_loader)
-            ood_1_ap_result = round(results_ood_1[0]['test_ap'], 3)
-            ood_1_auc_result = round(results_ood_1[0]['test_auc'], 3)
-
-            ood_1_ap.append(ood_1_ap_result)
-            ood_1_auc_roc.append(ood_1_auc_result)
-
-            ood_1_prior_fold = ood_1['withdrawn'].value_counts()[1] / (
-                ood_1['withdrawn'].value_counts()[1] + ood_1['withdrawn'].value_counts()[0]
-            )
-
-            ood_1_prior.append(ood_1_prior_fold)
-
             fold_ap.append(test_ap)
             fold_auc_roc.append(test_auc)
 
             if not results_path.exists():
                 results_path.mkdir(exist_ok=True, parents=True)
-                with open(results_path / "classification_results_ood.txt", "w") as file:
-                    file.write("OOD Classification results")
+                with open(results_path / "classification_results.txt", "w") as file:
+                    file.write("Classification results")
                     file.write("\n")
 
             results = {'Test AP': test_ap,
                        'Test AUC-ROC': test_auc,
-                       'CV_fold': cv_fold,
-                       'ood_1_ap': ood_1_ap_result,
-                       'ood_1_auc': ood_1_auc_result,
-                       'ood_1_prior': ood_1_prior_fold,
-                       }
+                       'CV_fold': cv_fold}
             version = {'version': logger.version}
             results = {logger.name: [results, version]}
-            with open(results_path / "classification_results_ood.txt", "a") as file:
+            with open(results_path / "classification_results.txt", "a") as file:
                 print(results, file=file)
                 file.write("\n")
 
@@ -407,14 +324,14 @@ def main(train_data, train_set, batch_size, gpu):
     print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
     print('\n')
 
-    print('Average ood_1 AP across folds: {}'.format(np.mean(ood_1_ap)))
-    print('Average ood_1 AUC across folds: {}'.format(np.mean(ood_1_auc_roc)))
-    print('Prior probability of ood_1: {}'.format(np.mean(ood_1_prior)))
+    for i, result in enumerate(fold_ap):
+        print('AP for fold {}= {}'.format(i, result))
 
-    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc,
-                               'ood_1_prior': ood_1_prior, 'ood_1_AP': ood_1_ap, 'ood_1_AUC': ood_1_auc_roc,
-                               }).to_csv(
-        results_path / "{}_ood_metrics.csv".format(logger.version))
+    for i, result in enumerate(fold_auc_roc):
+        print('AUC for fold {}= {}'.format(i, result))
+
+    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
+        results_path / "{}_metrics.csv".format(logger.version))
 
 
 if __name__ == '__main__':

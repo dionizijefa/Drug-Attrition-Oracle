@@ -1,12 +1,11 @@
-import math, copy
-
+import math
+import copy
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from torch.nn.init import _calculate_fan_in_and_fan_out, _no_grad_uniform_, _no_grad_normal_
+from torch.nn.init import _calculate_fan_in_and_fan_out, _no_grad_normal_, _no_grad_uniform_
 
 
 def xavier_normal_small_init_(tensor, gain=1.):
@@ -25,7 +24,6 @@ def xavier_uniform_small_init_(tensor, gain=1.):
 
     return _no_grad_uniform_(tensor, -a, a)
 
-### Model definition
 
 def make_model(d_atom, N=2, d_model=128, h=8, dropout=0.1, 
                lambda_attention=0.3, lambda_distance=0.3, trainable_lambda=False,
