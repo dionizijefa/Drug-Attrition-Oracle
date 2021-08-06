@@ -321,7 +321,6 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             test_ap = round(results[0]['test_ap'], 3)
             test_auc = round(results[0]['test_auc'], 3)
 
-            print(results)
             cv_fold.append(k)
 
             fold_ap.append(test_ap)
