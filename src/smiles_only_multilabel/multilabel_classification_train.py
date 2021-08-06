@@ -10,7 +10,7 @@ import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 from sklearn.utils import compute_class_weight
 from torchmetrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
@@ -253,7 +253,10 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         class_weight='balanced'
     ))
 
-    tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
+    #tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
+    tox_labels = LabelEncoder().fit_transform(data['Toxicity type'])
+    print(tox_labels)
+    print(error)
     for k, (train_index, test_index) in enumerate(
             train_test_splitter.split(data, data[withdrawn_col], data['Toxicity type'])
     ):
