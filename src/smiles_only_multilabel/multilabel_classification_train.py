@@ -108,11 +108,18 @@ class TransformerNet(pl.LightningModule, ABC):
         return {
             "predictions": metrics.get("predictions"),
             "targets": metrics.get("targets"),
+            "predictions_tox": metrics.get("predictions_tox"),
+            "tox_targets": metrics.get("tox_targets"),
         }
 
     def validation_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
+        predictions_tox = torch.cat([x.get('predictions_tox') for x in outputs], 0)
         targets = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
+
+        roc_auc_tox = (average_precision(predictions_tox, tox_targets))
+        ap_tox = (auroc(predictions_tox, tox_targets))
 
         ap = average_precision(predictions, targets)
         auc = auroc(predictions, targets)
@@ -130,12 +137,19 @@ class TransformerNet(pl.LightningModule, ABC):
         metrics = self.shared_step(batch, batch_idx)
         return {
             "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets")
+            "targets": metrics.get("targets"),
+            "predictions_tox": metrics.get("predictions_tox"),
+            "tox_targets": metrics.get("tox_targets"),
         }
 
     def test_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
+        predictions_tox = torch.cat([x.get('predictions_tox') for x in outputs], 0)
         target = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
+
+        roc_auc_tox = (average_precision(predictions_tox, tox_targets))
+        ap_tox = (auroc(predictions_tox, tox_targets))
 
         ap = average_precision(predictions, target)
         auc = auroc(predictions, target)
@@ -143,6 +157,8 @@ class TransformerNet(pl.LightningModule, ABC):
         log_metrics = {
             'test_ap': ap,
             'test_auc': auc,
+            'test_tox_auc': np.mean(roc_auc_tox),
+            'test_tox_ap': np.mean(ap_tox)
         }
         self.log_dict(log_metrics)
 
@@ -168,6 +184,8 @@ class TransformerNet(pl.LightningModule, ABC):
             'loss': loss,
             'predictions': y_hat,
             'targets': y.int(),
+            'predictions_tox': tox_y,
+            'tox_targets': y2.int()
         }
 
     def configure_optimizers(self):
@@ -246,6 +264,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     fold_ap = []
     fold_auc_roc = []
     cv_fold = []
+    fold_tox_ap = []
+    fold_tox_auc_roc = []
 
     pos_weight_toxs = torch.Tensor(compute_class_weight(
         classes=data['Toxicity type'].unique(),
@@ -323,29 +343,38 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             results_path = Path(root / "results")
             test_ap = round(results[0]['test_ap'], 3)
             test_auc = round(results[0]['test_auc'], 3)
+            test_tox_ap = round(results[0]['test_tox_ap'], 3)
+            test_tox_auc = round(results[0]['test_tox_auc'], 3)
 
             cv_fold.append(k)
 
             fold_ap.append(test_ap)
             fold_auc_roc.append(test_auc)
 
+            fold_tox_ap.append(test_tox_ap)
+            fold_tox_auc_roc.append(test_tox_auc)
+
             if not results_path.exists():
                 results_path.mkdir(exist_ok=True, parents=True)
-                with open(results_path / "classification_results.txt", "w") as file:
+                with open(results_path / "multilabel_classification_results.txt", "w") as file:
                     file.write("Classification results")
                     file.write("\n")
 
             results = {'Test AP': test_ap,
                        'Test AUC-ROC': test_auc,
-                       'CV_fold': cv_fold}
+                       'CV_fold': cv_fold,
+                       'Test TOX AP': test_tox_ap,
+                       'Test TOX AUC-ROC': test_tox_auc}
             version = {'version': logger.version}
             results = {logger.name: [results, version]}
-            with open(results_path / "classification_results.txt", "a") as file:
+            with open(results_path / "multilabel_classification_results.txt", "a") as file:
                 print(results, file=file)
                 file.write("\n")
 
     print('Average AP across folds: {}'.format(np.mean(fold_ap)))
     print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
+    print('Average TOX AP across folds: {}'.format(np.mean(fold_tox_ap)))
+    print('Average TOX AUC across folds: {}'.format(np.mean(fold_tox_auc_roc)))
     print('\n')
 
     for i, result in enumerate(fold_ap):
@@ -355,7 +384,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         print('AUC for fold {}= {}'.format(i, result))
 
     results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-        results_path / "{}_metrics.csv".format(logger.version))
+        results_path / "{}_multilabel_metrics.csv".format(logger.version))
 
 
 if __name__ == '__main__':
