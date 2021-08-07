@@ -8,10 +8,12 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+import torchmetrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 from sklearn.utils import compute_class_weight
+from torchmetrics import AUROC, AveragePrecision
 from torchmetrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -30,9 +32,9 @@ root = Path(__file__).resolve().parents[2].absolute()
 )
 class Conf:
     pos_weight_toxs: torch.Tensor = torch.Tensor(
-        [6.1926e-02, 5.2146e+00, 2.9651e+00, 1.6802e+01, 1.8903e+01, 7.2011e+00,
-        3.7806e+01, 6.5749e+00, 2.6073e+00, 7.9591e+00, 5.0407e+00, 3.0244e+01,
-        1.0081e+01, 3.7806e+01, 1.5122e+02, 1.5122e+02, 1.5122e+02, 1.5122e+02])
+        [0.07967708,  6.70935961,  3.81512605, 21.61904762, 24.32142857,
+        8.10714286, 38.91428571,  8.45962733,  3.3546798 ,  9.72857143,
+        6.2764977 , 38.91428571, 12.97142857, 48.64285714])
     pos_weight: torch.Tensor = torch.Tensor([8])
     gpus: int = 1
     seed: int = 42
@@ -81,7 +83,7 @@ class TransformerNet(pl.LightningModule, ABC):
             'distance_matrix_kernel': 'exp',
             'dropout': 0.0,
             'aggregation_type': 'mean',
-            'n_output': 19,
+            'n_output': 15,
         }
 
         self.model = make_model(**self.model_params)
@@ -118,19 +120,27 @@ class TransformerNet(pl.LightningModule, ABC):
         targets = torch.cat([x.get('targets') for x in outputs], 0)
         tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
-        roc_auc_tox = (average_precision(predictions_tox, tox_targets))
-        ap_tox = (auroc(predictions_tox, tox_targets))
+        ap_tox = average_precision(
+            predictions_tox, tox_targets, num_classes=14, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
+        )
+        ap_tox = torch.mean(torch.nan_to_num(torch.Tensor(ap_tox)))
+        roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=14)
 
         ap = average_precision(predictions, targets)
         auc = auroc(predictions, targets)
 
         log_metrics = {
             'val_ap_epoch': ap,
-            'val_auc_epoch': auc
+            'val_auc_epoch': auc,
+            'val_ap_tox_epoch': ap_tox,
+            'val_auc_tox_epoch': roc_auc_tox,
         }
         self.log_dict(log_metrics)
         self.log('val_ap',
                  ap,
+                 on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val_ap_tox',
+                 ap_tox,
                  on_step=False, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
@@ -148,8 +158,11 @@ class TransformerNet(pl.LightningModule, ABC):
         target = torch.cat([x.get('targets') for x in outputs], 0)
         tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
-        roc_auc_tox = (average_precision(predictions_tox, tox_targets))
-        ap_tox = (auroc(predictions_tox, tox_targets))
+        ap_tox = average_precision(
+            predictions_tox, tox_targets, num_classes=14, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
+        )
+        ap_tox = torch.mean(torch.nan_to_num(torch.Tensor(ap_tox)))
+        roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=14)
 
         ap = average_precision(predictions, target)
         auc = auroc(predictions, target)
@@ -157,8 +170,8 @@ class TransformerNet(pl.LightningModule, ABC):
         log_metrics = {
             'test_ap': ap,
             'test_auc': auc,
-            'test_tox_auc': np.mean(roc_auc_tox),
-            'test_tox_ap': np.mean(ap_tox)
+            'test_tox_auc': roc_auc_tox,
+            'test_tox_ap': ap_tox
         }
         self.log_dict(log_metrics)
 
@@ -175,8 +188,8 @@ class TransformerNet(pl.LightningModule, ABC):
 
         pos_weight_toxs = self.hparams.pos_weight_toxs.to("cuda")
         tox_y = predictions[:,1:]
-        loss_fn_toxs = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_toxs)
-        loss_toxs = loss_fn_toxs(tox_y, y2)
+        loss_fn_toxs = torch.nn.CrossEntropyLoss(weight=pos_weight_toxs)
+        loss_toxs = loss_fn_toxs(tox_y, y2.long())
 
         loss = loss + loss_toxs
 
@@ -275,8 +288,6 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
     #tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
     tox_labels = LabelEncoder().fit_transform(data['Toxicity type'])
-    print(tox_labels)
-    print(error)
     for k, (train_index, test_index) in enumerate(
             train_test_splitter.split(data, data[withdrawn_col], data['Toxicity type'])
     ):
