@@ -33,8 +33,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 class Conf:
     pos_weight_toxs: torch.Tensor = torch.Tensor(
         [0.07967708,  6.70935961,  3.81512605, 21.61904762, 24.32142857,
-        8.10714286, 38.91428571,  8.45962733,  3.3546798 ,  9.72857143,
-        6.2764977 , 38.91428571, 12.97142857, 48.64285714])
+        8.10714286, 38.91428571,  8.45962733,  3.3546798 ,  9.72857143])
     pos_weight: torch.Tensor = torch.Tensor([8])
     gpus: int = 1
     seed: int = 42
@@ -83,7 +82,7 @@ class TransformerNet(pl.LightningModule, ABC):
             'distance_matrix_kernel': 'exp',
             'dropout': 0.0,
             'aggregation_type': 'mean',
-            'n_output': 15,
+            'n_output': 11,
         }
 
         self.model = make_model(**self.model_params)
@@ -121,7 +120,7 @@ class TransformerNet(pl.LightningModule, ABC):
         tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
         ap_tox = average_precision(
-            predictions_tox, tox_targets, num_classes=14, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
+            predictions_tox, tox_targets, num_classes=11, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
         )
         ap_tox = torch.mean(torch.nan_to_num(torch.Tensor(ap_tox)))
         roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=14)
@@ -159,7 +158,7 @@ class TransformerNet(pl.LightningModule, ABC):
         tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
         ap_tox = average_precision(
-            predictions_tox, tox_targets, num_classes=14, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
+            predictions_tox, tox_targets, num_classes=11, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
         )
         ap_tox = torch.mean(torch.nan_to_num(torch.Tensor(ap_tox)))
         roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=14)
@@ -230,10 +229,9 @@ class TransformerNet(pl.LightningModule, ABC):
         return items
 
 @click.command()
-@click.option('-train_data', default='chembl_4_smiles.csv')
-@click.option('-dataset', default='all')
-@click.option('-withdrawn_col', default='withdrawn')
-@click.option('-batch_size', default=16)
+@click.option('-train_data', default='DS_min_consensus_DrugBank_referent_29July2021_sums_toxicity.csv')
+@click.option('-withdrawn_col', default='withdrawn_3.0')
+@click.option('-batch_size', default=8)
 @click.option('-gpu', default=1)
 def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     conf = Conf(
@@ -260,16 +258,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'Toxicity type']]
-        data = data.sample(frac=1, random_state=0)
-
-    else:
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.loc[(data['dataset'] == dataset) |
-                        (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col, 'Toxicity type']]
-        data = data.sample(frac=1, random_state=0)
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'Toxicity type']]
+    data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
