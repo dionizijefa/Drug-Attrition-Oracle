@@ -118,8 +118,9 @@ class TransformerNet(pl.LightningModule, ABC):
         ap = average_precision(
             predictions, targets, num_classes=10, sample_weights=self.hparams.pos_weight.to("cuda")
         )
-        ap= torch.mean(torch.nan_to_num(torch.Tensor(ap)))
-        auc = auroc(predictions.cpu(), targets.cpu(), average='weighted', num_classes=10)
+        ap = ap[~torch.any(torch.Tensor(ap).isnan())]
+        ap = torch.mean(ap).to("cuda")
+        auc = auroc(predictions.cpu(), targets.cpu(), average='weighted', num_classes=10).to("cuda")
 
         log_metrics = {
             'val_ap_epoch': ap,
@@ -144,7 +145,8 @@ class TransformerNet(pl.LightningModule, ABC):
         ap = average_precision(
             predictions, targets, num_classes=10, sample_weights=self.hparams.pos_weight.to("cuda")
         )
-        ap = torch.mean(torch.nan_to_num(torch.Tensor(ap)))
+        ap = ap[~torch.any(torch.Tensor(ap).isnan())]
+        ap = torch.mean(ap).to("cuda")
         auc = auroc(predictions.cpu(), targets.cpu(), average='weighted', num_classes=10)
 
         log_metrics = {
@@ -159,9 +161,9 @@ class TransformerNet(pl.LightningModule, ABC):
         # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
         predictions = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
         pos_weight = self.hparams.pos_weight_toxs.to("cuda")
-        predictions = predictions.unsqueeze(dim=0)
         loss_fn = torch.nn.CrossEntropyLoss(weight=pos_weight)
-        loss = loss_fn(predictions, y.long())
+        y = y.squeeze().long()
+        loss = loss_fn(predictions, y)
 
         return {
             'loss': loss,
