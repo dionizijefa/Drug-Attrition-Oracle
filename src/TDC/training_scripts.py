@@ -8,7 +8,7 @@ from typing import Dict, Optional
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from tdc.single_pred import ADME
+from tdc.single_pred import ADME, Tox
 from torchmetrics.functional import average_precision, auroc
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
@@ -238,6 +238,9 @@ def main(task, dataset, batch_size, gpu):
 
     if task == 'ADME':
         data = ADME(name=dataset)
+
+    elif task == 'Tox':
+        data = Tox(name=dataset)
 
     splits = data.get_split()
     train = splits['train']
