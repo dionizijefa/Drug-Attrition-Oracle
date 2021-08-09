@@ -20,7 +20,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
-from data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
+from data_utils import construct_dataset_multilabel, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
 
@@ -82,15 +82,15 @@ class TransformerNet(pl.LightningModule, ABC):
             'distance_matrix_kernel': 'exp',
             'dropout': 0.0,
             'aggregation_type': 'mean',
-            'n_output': 10,
+            'n_output': 11,
         }
 
         self.model = make_model(**self.model_params)
 
 
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
-        out1 = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
-        return out1
+        out1, out2 = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+        return out1, out2
 
     def training_step(self, batch, batch_idx):
         metrics = self.shared_step(batch, batch_idx)
@@ -109,64 +109,97 @@ class TransformerNet(pl.LightningModule, ABC):
         return {
             "predictions": metrics.get("predictions"),
             "targets": metrics.get("targets"),
+            "predictions_tox": metrics.get("predictions_tox"),
+            "tox_targets": metrics.get("tox_targets"),
         }
 
     def validation_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
+        predictions_tox = torch.cat([x.get('predictions_tox') for x in outputs], 0)
         targets = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
-        ap = average_precision(
-            predictions, targets, num_classes=10, sample_weights=self.hparams.pos_weight.to("cuda")
+        ap_tox = average_precision(
+            predictions_tox, tox_targets, num_classes=10, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
         )
-        ap= torch.mean(torch.nan_to_num(torch.Tensor(ap)))
-        auc = auroc(predictions.cpu(), targets.cpu(), average='weighted', num_classes=10)
+        ap_tox = ap_tox[~torch.any(torch.Tensor(ap_tox).isnan())]
+        ap_tox = torch.mean(ap_tox)
+        roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=10)
+
+        ap = average_precision(predictions, targets)
+        auc = auroc(predictions, targets)
 
         log_metrics = {
             'val_ap_epoch': ap,
             'val_auc_epoch': auc,
+            'val_ap_tox_epoch': ap_tox,
+            'val_auc_tox_epoch': roc_auc_tox,
         }
         self.log_dict(log_metrics)
         self.log('val_ap',
                  ap,
+                 on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val_ap_tox',
+                 ap_tox,
                  on_step=False, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
         metrics = self.shared_step(batch, batch_idx)
         return {
             "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets")
+            "targets": metrics.get("targets"),
+            "predictions_tox": metrics.get("predictions_tox"),
+            "tox_targets": metrics.get("tox_targets"),
         }
 
     def test_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
-        targets = torch.cat([x.get('targets') for x in outputs], 0)
+        predictions_tox = torch.cat([x.get('predictions_tox') for x in outputs], 0)
+        target = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
-        ap = average_precision(
-            predictions, targets, num_classes=10, sample_weights=self.hparams.pos_weight.to("cuda")
+        ap_tox = average_precision(
+            predictions_tox, tox_targets, num_classes=10, sample_weights=self.hparams.pos_weight_toxs.to("cuda")
         )
-        ap = torch.mean(torch.nan_to_num(torch.Tensor(ap)))
-        auc = auroc(predictions.cpu(), targets.cpu(), average='weighted', num_classes=10)
+        ap_tox = ap_tox[~torch.any(torch.Tensor(ap_tox).isnan())]
+        ap_tox = torch.mean(ap_tox)
+        roc_auc_tox = auroc(predictions_tox.cpu(), tox_targets.cpu(), average='weighted', num_classes=10)
+
+        ap = average_precision(predictions, target)
+        auc = auroc(predictions, target)
 
         log_metrics = {
             'test_ap': ap,
-            'test_auc': auc
+            'test_auc': auc,
+            'test_tox_auc': roc_auc_tox,
+            'test_tox_ap': ap_tox
         }
         self.log_dict(log_metrics)
 
     def shared_step(self, batch, batchidx):
-        adjacency_matrix, node_features, distance_matrix, y = batch
+        adjacency_matrix, node_features, distance_matrix, y, y2 = batch
         batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
         # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
         predictions = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
-        pos_weight = self.hparams.pos_weight_toxs.to("cuda")
-        predictions = predictions.unsqueeze(dim=0)
-        loss_fn = torch.nn.CrossEntropyLoss(weight=pos_weight)
-        loss = loss_fn(predictions, y.long())
+
+        y_hat = predictions[:,0].unsqueeze(dim=-1)
+        pos_weight = self.hparams.pos_weight.to("cuda")
+        loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        loss = loss_fn(y_hat, y)
+
+        pos_weight_toxs = self.hparams.pos_weight_toxs.to("cuda")
+        tox_y = predictions[:,1:]
+        loss_fn_toxs = torch.nn.CrossEntropyLoss(weight=pos_weight_toxs)
+        loss_toxs = loss_fn_toxs(tox_y, y2.long())
+
+        loss = loss + loss_toxs
 
         return {
             'loss': loss,
-            'predictions': predictions,
+            'predictions': y_hat,
             'targets': y.int(),
+            'predictions_tox': tox_y,
+            'tox_targets': y2.int()
         }
 
     def configure_optimizers(self):
@@ -199,10 +232,10 @@ class TransformerNet(pl.LightningModule, ABC):
 
 @click.command()
 @click.option('-train_data', default='DS_min_consensus_DrugBank_referent_29July2021_sums_toxicity.csv')
-@click.option('-tox_col', default='Toxicity type')
+@click.option('-withdrawn_col', default='withdrawn_3.0')
 @click.option('-batch_size', default=8)
 @click.option('-gpu', default=1)
-def main(train_data, tox_col, batch_size, gpu):
+def main(train_data, withdrawn_col, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -227,7 +260,7 @@ def main(train_data, tox_col, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', tox_col]]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'Toxicity type']]
     data = data.sample(frac=1, random_state=0)
 
     train_test_splitter = StratifiedKFold(n_splits=5)
@@ -236,45 +269,53 @@ def main(train_data, tox_col, batch_size, gpu):
     fold_ap = []
     fold_auc_roc = []
     cv_fold = []
+    fold_tox_ap = []
+    fold_tox_auc_roc = []
 
-    pos_weight = torch.Tensor(compute_class_weight(
-        classes=data[tox_col].unique(),
-        y=data[tox_col],
+    pos_weight_toxs = torch.Tensor(compute_class_weight(
+        classes=data['Toxicity type'].unique(),
+        y=data['Toxicity type'],
         class_weight='balanced'
     ))
 
     #tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
-    tox_labels = LabelEncoder().fit_transform(data[tox_col])
+    tox_labels = LabelEncoder().fit_transform(data['Toxicity type'])
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data[tox_col])
+            train_test_splitter.split(data, data[withdrawn_col], data['Toxicity type'])
     ):
-        y_test = tox_labels[test_index]
+        y2_test = tox_labels[test_index]
         X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
-                                               y_test,
+                                               data.iloc[test_index][withdrawn_col],
                                                one_hot_formal_charge=True)
-        test_dataset = construct_dataset(X_test, y_test)
+        test_dataset = construct_dataset_multilabel(X_test, y_test, y2_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
         train_data = data.iloc[train_index]
         train_toxs = tox_labels[train_index]
 
         for train_index_2, val_index in train_val_splitter.split(
-                train_data, train_data[tox_col]
+                train_data, train_data[withdrawn_col], train_data['Toxicity type']
         ):
             X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
-                                                 train_toxs[val_index],
+                                                 train_data.iloc[val_index][withdrawn_col],
                                                  one_hot_formal_charge=True)
-            val_dataset = construct_dataset(X_val, y_val)
+            y2_val = train_toxs[val_index]
+            val_dataset = construct_dataset_multilabel(X_val, y_val, y2_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
             X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
-                                                     train_toxs[train_index_2],
+                                                     train_data.iloc[train_index_2][withdrawn_col],
                                                      one_hot_formal_charge=True)
-            train_dataset = construct_dataset(X_train, y_train)
+            y2_train = train_toxs[train_index_2]
+            train_dataset = construct_dataset_multilabel(X_train, y_train, y2_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
 
+            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
+                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
+
             conf.pos_weight = pos_weight
+            conf.pos_weight_toxs = pos_weight_toxs
 
             model = TransformerNet(
                 conf.to_hparams(),
@@ -305,29 +346,38 @@ def main(train_data, tox_col, batch_size, gpu):
             results_path = Path(root / "results")
             test_ap = round(results[0]['test_ap'], 3)
             test_auc = round(results[0]['test_auc'], 3)
+            test_tox_ap = round(results[0]['test_tox_ap'], 3)
+            test_tox_auc = round(results[0]['test_tox_auc'], 3)
 
             cv_fold.append(k)
 
             fold_ap.append(test_ap)
             fold_auc_roc.append(test_auc)
 
+            fold_tox_ap.append(test_tox_ap)
+            fold_tox_auc_roc.append(test_tox_auc)
+
             if not results_path.exists():
                 results_path.mkdir(exist_ok=True, parents=True)
-                with open(results_path / "tox_classification_results.txt", "w") as file:
-                    file.write("Tox Classification results")
+                with open(results_path / "multilabel_classification_results.txt", "w") as file:
+                    file.write("Classification results")
                     file.write("\n")
 
             results = {'Test AP': test_ap,
                        'Test AUC-ROC': test_auc,
-                       'CV_fold': cv_fold,}
+                       'CV_fold': cv_fold,
+                       'Test TOX AP': test_tox_ap,
+                       'Test TOX AUC-ROC': test_tox_auc}
             version = {'version': logger.version}
             results = {logger.name: [results, version]}
-            with open(results_path / "tox_classification_results.txt", "a") as file:
+            with open(results_path / "multilabel_classification_results.txt", "a") as file:
                 print(results, file=file)
                 file.write("\n")
 
     print('Average AP across folds: {}'.format(np.mean(fold_ap)))
     print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
+    print('Average TOX AP across folds: {}'.format(np.mean(fold_tox_ap)))
+    print('Average TOX AUC across folds: {}'.format(np.mean(fold_tox_auc_roc)))
     print('\n')
 
     for i, result in enumerate(fold_ap):
@@ -337,7 +387,7 @@ def main(train_data, tox_col, batch_size, gpu):
         print('AUC for fold {}= {}'.format(i, result))
 
     results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-        results_path / "{}_tox_metrics.csv".format(logger.version))
+        results_path / "{}_multilabel_metrics.csv".format(logger.version))
 
 
 if __name__ == '__main__':
