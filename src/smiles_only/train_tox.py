@@ -232,7 +232,7 @@ def main(train_data, tox_col, batch_size, gpu):
     data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', tox_col]]
     data = data.sample(frac=1, random_state=0)
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_test_splitter = StratifiedShuffleSplit(n_splits=3, test_size=0.3)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
     fold_ap = []
@@ -245,11 +245,14 @@ def main(train_data, tox_col, batch_size, gpu):
         class_weight='balanced'
     ))
 
+
     #tox_labels = LabelBinarizer().fit_transform(data['Toxicity type'])
     tox_labels = LabelEncoder().fit_transform(data[tox_col])
     for k, (train_index, test_index) in enumerate(
             train_test_splitter.split(data, data[tox_col])
     ):
+
+
         y_test = tox_labels[test_index]
         X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
                                                y_test,
