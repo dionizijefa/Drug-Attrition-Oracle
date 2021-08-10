@@ -17,6 +17,7 @@ import torch
 from data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
+
 root = Path(__file__).resolve().parents[2].absolute()
 
 
@@ -27,7 +28,7 @@ class Conf:
     gpus: int = 1
     seed: int = 42
     use_16bit: bool = False
-    save_dir = '{}/models/'.format(root)
+    save_dir = '{}/models/TDC/'.format(root)
     lr: float = 1e-4
     batch_size: int = 32
     epochs: int = 300
@@ -53,11 +54,12 @@ class Conf:
 class TransformerNet(pl.LightningModule, ABC):
     def __init__(
             self,
-            task,
+            problem,
             hparams,
             reduce_lr: Optional[bool] = True,
     ):
         super().__init__()
+        self.task = problem
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
         self.model_params = {
@@ -74,7 +76,6 @@ class TransformerNet(pl.LightningModule, ABC):
             'dropout': 0.0,
             'aggregation_type': 'mean'
         }
-        self.task = task
         self.model = make_model(**self.model_params)
         pretrained_name = root / 'pretrained_weights.pt'
         pretrained_state_dict = torch.load(pretrained_name)
@@ -152,8 +153,8 @@ class TransformerNet(pl.LightningModule, ABC):
             auc = auroc(predictions, targets)
 
             log_metrics = {
-                'test_ap_epoch': ap,
-                'test_auc_epoch': auc
+                'test_ap': ap,
+                'test_auc': auc
             }
             self.log_dict(log_metrics)
 
@@ -199,7 +200,6 @@ class TransformerNet(pl.LightningModule, ABC):
             'monitor': 'val_loss'
         }
 
-
         if self.reduce_lr is False:
             return [opt]
 
@@ -213,11 +213,11 @@ class TransformerNet(pl.LightningModule, ABC):
 
 
 @click.command()
-@click.option('-task')
+@click.option('-problem')
 @click.option('-dataset')
 @click.option('-batch_size', default=8)
 @click.option('-gpu', default=1)
-def main(task, dataset, batch_size, gpu):
+def main(problem, dataset, batch_size, gpu):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -228,7 +228,7 @@ def main(task, dataset, batch_size, gpu):
     logger = TensorBoardLogger(
         conf.save_dir,
         name='transformer_net',
-        version='{}'.format(str(int(time()))),
+        version='{}_{}'.format(problem, dataset),
     )
 
     # Copy this script and all files used in training
@@ -236,20 +236,20 @@ def main(task, dataset, batch_size, gpu):
     log_dir.mkdir(exist_ok=True, parents=True)
     shutil.copy(Path(__file__), log_dir)
 
-    if task == 'ADME':
+    if problem == 'ADME':
         data = ADME(name=dataset)
 
-    elif task == 'Tox':
+    elif problem == 'Tox':
         data = Tox(name=dataset)
 
     splits = data.get_split()
     train = splits['train']
-    val = splits['val']
+    val = splits['valid']
     test = splits['test']
 
     X_train, y_train = load_data_from_smiles(train['Drug'],
-                                            train['Y'],
-                                            one_hot_formal_charge=True)
+                                             train['Y'],
+                                             one_hot_formal_charge=True)
     train_dataset = construct_dataset(X_train, y_train)
     train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
@@ -260,8 +260,8 @@ def main(task, dataset, batch_size, gpu):
     val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
     X_test, y_test = load_data_from_smiles(test['Drug'],
-                                         test['Y'],
-                                         one_hot_formal_charge=True)
+                                           test['Y'],
+                                           one_hot_formal_charge=True)
     test_dataset = construct_dataset(X_test, y_test)
     test_loader = DataLoader(test_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
@@ -275,21 +275,21 @@ def main(task, dataset, batch_size, gpu):
     else:
         task = 'regression'
 
-    early_stop_callback = EarlyStopping(monitor=('val_ap_epoch' if task=='classification' else 'val_loss_epoch'),
+    early_stop_callback = EarlyStopping(monitor=('val_ap_epoch' if task == 'classification' else 'val_loss_epoch'),
                                         min_delta=0.00,
-                                        mode=('max' if task=='classification' else 'min'),
+                                        mode=('max' if task == 'classification' else 'min'),
                                         patience=10,
                                         verbose=False)
 
     model = TransformerNet(
-        conf.to_hparams(),
+        hparams=conf.to_hparams(),
+        problem=task,
         reduce_lr=conf.reduce_lr,
-        task=task
     )
 
     model_checkpoint = ModelCheckpoint(
         dirpath=(logger.log_dir + '/checkpoint/'),
-        monitor='val_ap_epoch',
+        monitor=('val_ap_epoch' if task == 'classification' else 'val_loss_epoch'),
         mode='max',
         save_top_k=1,
     )
@@ -308,6 +308,17 @@ def main(task, dataset, batch_size, gpu):
     )
 
     trainer.fit(model, train_loader, val_loader)
+    results = trainer.test(model, test_loader)
+
+    if task == 'classification':
+        test_ap = round(results[0]['test_ap'], 3)
+        test_auc = round(results[0]['test_auc'], 3)
+        print('Task {}-{} Test AUC {}'.format(task, dataset, test_auc))
+        print('Task {}-{} Test AP {}'.format(task, dataset, test_ap))
+
+    else:
+        test_rmse = round(results[0]['test_loss'], 3)
+        print('Task {}-{} Test RMSE {}'.format(task, dataset, test_rmse))
 
     results_path = Path(root / "results")
     if not results_path.exists():
@@ -316,10 +327,17 @@ def main(task, dataset, batch_size, gpu):
             file.write("Production version")
             file.write("\n")
 
-    version = {'version': logger.version}
-    results = {logger.name: version}
+    version = {'version': logger.version,
+               'task': '{}-{}'.format(problem, dataset)}
+    if task == 'classification':
+        results = {'Test AP': test_ap,
+                   'Test AUC-ROC': test_auc}
+        results = {logger.name: [results, version]}
+    else:
+        results = {'Test RMSE': test_rmse}
+        results = {logger.name: [results, version]}
+
     with open(results_path / "TDC_results.txt", "a") as file:
-        print('Task: {}-{}'.format(task, dataset))
         print(results, file=file)
         file.write("\n")
 
