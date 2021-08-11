@@ -217,7 +217,8 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-dataset')
 @click.option('-batch_size', default=8)
 @click.option('-gpu', default=1)
-def main(problem, dataset, batch_size, gpu):
+@click.option('-tox21_task', default=None)
+def main(problem, dataset, batch_size, gpu, tox21_task):
     conf = Conf(
         lr=1e-4,
         batch_size=batch_size,
@@ -225,11 +226,19 @@ def main(problem, dataset, batch_size, gpu):
         reduce_lr=True,
     )
 
-    logger = TensorBoardLogger(
-        conf.save_dir,
-        name='transformer_net',
-        version='{}_{}'.format(problem, dataset),
-    )
+    if dataset == 'tox21':
+        logger = TensorBoardLogger(
+            conf.save_dir,
+            name='transformer_net',
+            version='{}_{}_{}'.format(problem, dataset, tox21_task),
+        )
+
+    else:
+        logger = TensorBoardLogger(
+            conf.save_dir,
+            name='transformer_net',
+            version='{}_{}'.format(problem, dataset),
+        )
 
     # Copy this script and all files used in training
     log_dir = Path(logger.log_dir)
@@ -239,8 +248,11 @@ def main(problem, dataset, batch_size, gpu):
     if problem == 'ADME':
         data = ADME(name=dataset)
 
-    elif problem == 'Tox':
+    elif problem == 'Tox' and dataset != 'tox21':
         data = Tox(name=dataset)
+
+    else:
+        data = Tox(name=dataset, label_name=tox21_task)
 
     splits = data.get_split()
     train = splits['train']
@@ -329,6 +341,11 @@ def main(problem, dataset, batch_size, gpu):
 
     version = {'version': logger.version,
                'task': '{}-{}'.format(problem, dataset)}
+
+    if dataset == 'tox21':
+        version = {'version': logger.version,
+                   'task': '{}-{}-{}'.format(problem, dataset, tox21_task)}
+
     if task == 'classification':
         results = {'Test AP': test_ap,
                    'Test AUC-ROC': test_auc}
