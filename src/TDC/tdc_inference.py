@@ -86,7 +86,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     results_df = pd.DataFrame(results)
     results_df['smiles'] = data['smiles'].values
     results_df['chembl_id'] = data['chembl_id'].values
-    results_df.to_csv(root/ 'data/subtasks_predictions.csv')
+    results_df['withdrawn'] = data[withdrawn_col].values
+    results_df.to_csv(root / 'data/subtasks_predictions.csv')
 
 
 if __name__ == '__main__':
