@@ -6,7 +6,6 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from data_utils import load_data_from_smiles, construct_dataset
-from tdc_inference import TransformerNet as TfNet
 from tqdm import tqdm
 from transformer import make_model
 
@@ -40,18 +39,19 @@ class TransformerNet(pl.LightningModule, ABC):
         return out
 
 
+@click.command()
 @click.option('-train_data', default='chembl_4_smiles.csv')
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='withdrawn')
-def main(train_data, dataset, withdrawn_col, batch_size, gpu):
+def main(train_data, dataset, withdrawn_col):
     if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col, 'chembl_id']]
 
     else:
         data = pd.read_csv(root / 'data/{}'.format(train_data))
         data = data.loc[(data['dataset'] == dataset) |
                         (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
+                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col, 'chembl_id']]
 
     X_train, y_train = load_data_from_smiles(data['smiles'], data[withdrawn_col],
                                              one_hot_formal_charge=True)
@@ -62,13 +62,13 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     task_counter = 0
     num_tasks = 37
     for subdir in admes.iterdir():
-        print('Doing inference for task {}/{}: {}'.format(task_counter, num_tasks, task_name))
         task_name = str(subdir).split('/')[-1]
+        print('Doing inference for task {}/{}: {}'.format(task_counter, num_tasks, task_name))
         for file in Path(subdir / 'checkpoint').iterdir():
             checkpoint_file = file
 
         outputs = []
-        model = TfNet.load_from_checkpoint(checkpoint_path=checkpoint_file, task=task_name)
+        model = TransformerNet.load_from_checkpoint(checkpoint_path=str(checkpoint_file), task=task_name)
         model.eval()
         for i in tqdm(X_train):
             node_features = torch.Tensor(i[0]).unsqueeze(0)
