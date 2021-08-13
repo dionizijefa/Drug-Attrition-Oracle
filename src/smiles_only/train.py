@@ -253,16 +253,16 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         test_dataset = construct_dataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
-        train_data = X_data[train_index]
+        train_set = X_data[train_index]
         train_labels = y_data[test_index]
 
-        for train_index_2, val_index in train_val_splitter.split(train_data, train_labels):
-            X_val = train_data[val_index]
+        for train_index_2, val_index in train_val_splitter.split(train_set, train_labels):
+            X_val = train_set[val_index]
             y_val = train_labels[val_index]
             val_dataset = construct_dataset(X_val, y_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
-            X_train = train_data[train_index_2]
+            X_train = train_set[train_index_2]
             y_train = train_labels[train_index_2]
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
