@@ -234,6 +234,10 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                         (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
         data = data.sample(frac=1, random_state=0)
 
+    X_data, y_data = load_data_from_smiles(data['smiles'], data[withdrawn_col], one_hot_formal_charge=True)
+    X_data = np.array(X_data)
+    y_data = np.array(y_data)
+
     train_test_splitter = StratifiedKFold(n_splits=5)
     train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
@@ -242,33 +246,29 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     cv_fold = []
 
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data[withdrawn_col])
+            train_test_splitter.split(X_data, y_data)
     ):
-        X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
-                                               data.iloc[test_index][withdrawn_col],
-                                               one_hot_formal_charge=True)
+        X_test = X_data[test_index]
+        y_test = X_data[test_index]
         test_dataset = construct_dataset(X_test, y_test)
         test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
 
-        train_data = data.iloc[train_index]
+        train_data = X_data[train_index]
+        train_labels = y_data[test_index]
 
-        for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
-            X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
-                                                 train_data.iloc[val_index][withdrawn_col],
-                                                 one_hot_formal_charge=True)
+        for train_index_2, val_index in train_val_splitter.split(train_data, train_labels):
+            X_val = train_data[val_index]
+            y_val = train_labels[val_index]
             val_dataset = construct_dataset(X_val, y_val)
             val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
-            X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
-                                                     train_data.iloc[train_index_2][withdrawn_col],
-                                                     one_hot_formal_charge=True)
+            X_train = train_data[train_index_2]
+            y_train = train_labels[train_index_2]
             train_dataset = construct_dataset(X_train, y_train)
             train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                       batch_size=conf.batch_size)
 
-            pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
-                                        train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
-
+            pos_weight = torch.Tensor([(len(y_train) / np.count_nonzero(y_train))])
             conf.pos_weight = pos_weight
 
             model = TransformerNet(
@@ -280,8 +280,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             trainer = pl.Trainer(
                 max_epochs=conf.epochs,
                 gpus=[gpu],  # [0]
-                logger=logger,
-                resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
+                logger=logger,  # load from checkpoint instead of resume
                 weights_summary='top',
                 callbacks=[early_stop_callback],
                 checkpoint_callback=ModelCheckpoint(
