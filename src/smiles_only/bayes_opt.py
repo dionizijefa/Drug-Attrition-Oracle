@@ -19,6 +19,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch
+from skopt.utils import use_named_args
 from data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
 import click
@@ -47,7 +48,7 @@ class Conf:
     lambda_distance: float = 0.33
     leaky_relu_slope: int = 0.1
     distance_matrix_kernel: str = 'softmax'
-    dropout: float = 0.0,
+    dropout: float = 0.0
     dense_output_nonlinearity: str = 'tanh'
     pos_weight: torch.Tensor = torch.Tensor([8])
 
@@ -85,13 +86,14 @@ class TransformerNet(pl.LightningModule, ABC):
             'lambda_attention': self.hparams.lambda_attention,
             'lambda_distance': self.hparams.lambda_distance,
             'leaky_relu_slope': self.hparams.leaky_relu_slope,
-            'dense_output_nonlinearity': self.hparmas.dense_output_nonlinearity,
+            'dense_output_nonlinearity': self.hparams.dense_output_nonlinearity,
             'distance_matrix_kernel': self.hparams.distance_matrix_kernel,
             'dropout': self.hparams.dropout,
             'aggregation_type': 'mean',
         }
 
         pl.seed_everything(hparams['seed'])
+        self.model = make_model(**self.model_params)
 
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
         out = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
@@ -218,21 +220,40 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     X_data = np.array(X_data)
     y_data = np.array(y_data)
 
-    param_space = [
-        Real(0.0005, 0.01, name='lr'),
-        Integer(28, 1024, name='d_model'),
-        Integer(1, 16, name='N'),
-        Integer(1, 16, name='h'),
-        Integer(1, 4, name='N_dense'),
-        Real(0.1, 0.9, name='lambda_attention'),
-        Real(0.1, 0.9, name='lambda_distance'),
-        Real(0.01, 0.5, name='leaky_relu_slope'),
-        Categorical(['exp', 'softmax'], name='distance_matrix_kernel'),
-        Real(0.05, 0.5, name='dropout'),
-        Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
-    ]
+    """
+    param_space = {
+        'lr': Real(0.0005, 0.01, name='lr'),
+        'd_model': Integer(28, 1024, name='d_model'),
+        'N': Integer(1, 16, name='N'),
+        'h': Integer(1, 16, name='h'),
+        'N_dense': Integer(1, 4, name='N_dense'),
+        'lambda_attention': Real(0.1, 0.9, name='lambda_attention'),
+        'lambda_distance': Real(0.1, 0.9, name='lambda_distance'),
+        'leaky_relu_slope': Real(0.01, 0.5, name='leaky_relu_slope'),
+        'distance_matrix_kernel': Categorical(['exp', 'softmax'], name='distance_matrix_kernel'),
+        'dropout': Real(0.05, 0.5, name='dropout'),
+        'dense_output_nonlinearity': Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
+    }
+    """
 
-    def maximize_ap(param_space):
+    dim_1 = Real(0.0005, 0.01, name='lr')
+    dim_2 = Categorical([32, 64, 128, 256, 512, 1024], name='d_model')
+    dim_3 = Integer(2, 16, name='N')
+    dim_4 = Categorical([4, 8, 16], name='h')
+    dim_5 = Integer(1, 6, name='N_dense')
+    dim_6 = Real(0.1, 0.9, name='lambda_attention')
+    dim_7 = Real(0.1, 0.9, name='lambda_distance')
+    dim_8 = Real(0.01, 0.5, name='leaky_relu_slope')
+    dim_9 = Categorical(['exp', 'softmax'], name='distance_matrix_kernel')
+    dim_10 = Real(0.05, 0.5, name='dropout')
+    dim_11 = Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
+
+    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5,
+                  dim_6, dim_7, dim_8, dim_9, dim_10, dim_11]
+
+    @use_named_args(dimensions=dimensions)
+    def maximize_ap(lr, d_model, N, h, N_dense, lambda_attention, lambda_distance, leaky_relu_slope,
+                    distance_matrix_kernel, dropout, dense_output_nonlinearity):
         train_test_splitter = StratifiedKFold(n_splits=2)
 
         fold_ap = []
@@ -242,19 +263,19 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         ):
 
             conf = Conf(
-                lr=param_space['lr'],
+                lr=lr,
                 batch_size=batch_size,
                 reduce_lr=True,
-                d_model=param_space['d_model'],
-                N=param_space['N'],
-                h=param_space['h'],
-                N_dense=param_space['N_dense'],
-                lambda_attention=param_space['lambda_attention'],
-                lambda_distance=param_space['lambda_distance'],
-                leaky_relu_slope=param_space['leaky_relu_slope'],
-                dense_output_nonlinearity=param_space['dense_output_nonlinearity'],
-                distance_matrix_kernel=param_space['distance_matrix_kernel'],
-                dropout=param_space['dropout'],
+                d_model=d_model,
+                N=N,
+                h=h,
+                N_dense=N_dense,
+                lambda_attention=lambda_attention,
+                lambda_distance=lambda_distance,
+                leaky_relu_slope=leaky_relu_slope,
+                dense_output_nonlinearity=dense_output_nonlinearity,
+                distance_matrix_kernel=distance_matrix_kernel,
+                dropout=dropout,
             )
 
             logger = TensorBoardLogger(
@@ -326,19 +347,34 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
             fold_ap.append(test_ap)
 
-        return np.mean(fold_ap)
+        return 1/np.mean(fold_ap)
 
+    start = time()
     res = gp_minimize(maximize_ap,  # the function to minimize
-                      param_space,  # the bounds on each dimension of x
+                      dimensions=dimensions,  # the bounds on each dimension of x
                       acq_func="EI",  # the acquisition function
-                      n_calls=5,  # the number of evaluations of f
+                      n_calls=20,  # the number of evaluations of f
                       n_random_starts=5,  # the number of random initialization points
                       random_state=1234)  # the random seed
+    end = time()
+    elapsed = (end-start) / 3600
 
-    plot_convergence(res)
     print('Value of the minimum: {}'.format(res.fun))
     print('Res space: {}'.format(res.space))
+    print('Time elapsed in hrs: {}'.format(elapsed))
 
+    results_path = Path(root / 'bayes_opt')
+    if not results_path.exists():
+        results_path.mkdir(exist_ok=True, parents=True)
+        with open(results_path / "bayes_opt.txt", "w") as file:
+            file.write("Bayes opt")
+            file.write("\n")
+
+        with open(results_path / "bayes_opt.txt", "a") as file:
+            print('Maximum AP: {}'.format(res.fun), file=file)
+            print('Res space: {}'.format(res.space), file=file)
+            file.write("\n")
+            file.write("\n")
 
 if __name__ == '__main__':
     main()

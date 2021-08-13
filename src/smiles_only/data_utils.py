@@ -82,13 +82,13 @@ def load_data_from_smiles(x_smiles, labels, add_dummy_node=True, one_hot_formal_
     for smiles, label in zip(x_smiles, labels):
         try:
             mol = MolFromSmiles(smiles)
-            #try:
-               # mol = Chem.AddHs(mol)
-                #AllChem.EmbedMolecule(mol, maxAttempts=5000)
-                #AllChem.UFFOptimizeMolecule(mol)
-                #mol = Chem.RemoveHs(mol)
-            #except:
-            AllChem.Compute2DCoords(mol)
+            try:
+                mol = Chem.AddHs(mol)
+                AllChem.EmbedMolecule(mol, maxAttempts=5000)
+                AllChem.UFFOptimizeMolecule(mol)
+                mol = Chem.RemoveHs(mol)
+            except:
+                AllChem.Compute2DCoords(mol)
 
             afm, adj, dist = featurize_mol(mol, add_dummy_node, one_hot_formal_charge)
             x_all.append([afm, adj, dist])
