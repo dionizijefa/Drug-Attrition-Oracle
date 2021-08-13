@@ -10,9 +10,11 @@ import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from skopt.space import Integer
+from skopt import gp_minimize
+from skopt.plots import plot_convergence
+from skopt.space import Integer, Real, Categorical
 from torchmetrics.functional import average_precision, auroc
-from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, train_test_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -34,10 +36,9 @@ class Conf:
     save_dir = '{}/models/'.format(root)
     lr: float = 0.0005
     batch_size: int = 32
-    epochs: int = 300
+    epochs: int = 100
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
-    d_atom: int = 28
     d_model: int = 64
     N: int = 4
     h: int = 8
@@ -76,7 +77,7 @@ class TransformerNet(pl.LightningModule, ABC):
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
         self.model_params = {
-            'd_atom': self.hparams.d_atom,
+            'd_atom': 28,
             'd_model': self.hparams.d_model,
             'N': self.hparams.N,
             'h': self.hparams.h,
@@ -87,21 +88,10 @@ class TransformerNet(pl.LightningModule, ABC):
             'dense_output_nonlinearity': self.hparmas.dense_output_nonlinearity,
             'distance_matrix_kernel': self.hparams.distance_matrix_kernel,
             'dropout': self.hparams.dropout,
-            'aggregation_type': self.hparams.aggregation_type,
+            'aggregation_type': 'mean',
         }
 
-        self.model = make_model(**self.model_params)
-        pretrained_name = root / 'pretrained_weights.pt'
-        pretrained_state_dict = torch.load(pretrained_name)
         pl.seed_everything(hparams['seed'])
-
-        model_state_dict = self.model.state_dict()
-        for name, param in pretrained_state_dict.items():
-            if 'generator' in name:
-                continue
-            if isinstance(param, torch.nn.Parameter):
-                param = param.data
-            model_state_dict[name].copy_(param)
 
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
         out = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
@@ -188,8 +178,8 @@ class TransformerNet(pl.LightningModule, ABC):
             'scheduler': ReduceLROnPlateau(
                 opt,
                 mode='min',
-                patience=10,
-                factor=0.5,
+                patience=6,
+                factor=0.1,
             ),
             'monitor': 'val_loss'
         }
@@ -224,144 +214,130 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                         (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
         data = data.sample(frac=1, random_state=0)
 
-    logger = TensorBoardLogger(
-        '{}/models/'.format(root),
-        name='transformer_net',
-        version='{}'.format(str(int(time()))),
-    )
-
-    log_dir = Path(logger.log_dir)
-    log_dir.mkdir(exist_ok=True, parents=True)
-    shutil.copy(Path(__file__), log_dir)
-
-    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                        min_delta=0.00,
-                                        mode='max',
-                                        patience=15,
-                                        verbose=False)
+    X_data, y_data = load_data_from_smiles(data['smiles'], data[withdrawn_col], one_hot_formal_charge=True)
+    X_data = np.array(X_data)
+    y_data = np.array(y_data)
 
     param_space = [
+        Real(0.0005, 0.01, name='lr'),
         Integer(28, 1024, name='d_model'),
         Integer(1, 16, name='N'),
-        Integer(1, )
-        'N': self.hparams.N,
-        'h': self.hparams.h,
-        'N_dense': self.hparams.N_dense,
-        'lambda_attention': self.hparams.lambda_attention,
-        'lambda_distance': self.hparams.lambda_distance,
-        'leaky_relu_slope': self.hparams.leaky_relu_slope,
-        'dense_output_nonlinearity': self.hparmas.dense_output_nonlinearity,
-        'distance_matrix_kernel': self.hparams.distance_matrix_kernel,
-        'dropout': self.hparams.dropout,
-        'aggregation_type': self.hparams.aggregation_type,
+        Integer(1, 16, name='h'),
+        Integer(1, 4, name='N_dense'),
+        Real(0.1, 0.9, name='lambda_attention'),
+        Real(0.1, 0.9, name='lambda_distance'),
+        Real(0.01, 0.5, name='leaky_relu_slope'),
+        Categorical(['exp', 'softmax'], name='distance_matrix_kernel'),
+        Real(0.05, 0.5, name='dropout'),
+        Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
     ]
 
     def maximize_ap(param_space):
+        train_test_splitter = StratifiedKFold(n_splits=2)
 
-        conf = Conf(
-            lr=1e-4,
-            batch_size=batch_size,
-            epochs=100,
-            reduce_lr=True,
-            d_atom=d_atom,
-            d_model=
-        )
-
-        train_test_splitter = StratifiedKFold(n_splits=5)
-        train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
-
+        fold_ap = []
 
         for k, (train_index, test_index) in enumerate(
-                train_test_splitter.split(data, data[withdrawn_col])
+                train_test_splitter.split(X_data, y_data)
         ):
-            X_test, y_test = load_data_from_smiles(data.iloc[test_index]['smiles'],
-                                                   data.iloc[test_index][withdrawn_col],
-                                                   one_hot_formal_charge=True)
+
+            conf = Conf(
+                lr=param_space['lr'],
+                batch_size=batch_size,
+                reduce_lr=True,
+                d_model=param_space['d_model'],
+                N=param_space['N'],
+                h=param_space['h'],
+                N_dense=param_space['N_dense'],
+                lambda_attention=param_space['lambda_attention'],
+                lambda_distance=param_space['lambda_distance'],
+                leaky_relu_slope=param_space['leaky_relu_slope'],
+                dense_output_nonlinearity=param_space['dense_output_nonlinearity'],
+                distance_matrix_kernel=param_space['distance_matrix_kernel'],
+                dropout=param_space['dropout'],
+            )
+
+            logger = TensorBoardLogger(
+                conf.save_dir,
+                name='transformer_net',
+                version='{}'.format(str(int(time()))),
+            )
+
+            # Copy this script and all files used in training
+            log_dir = Path(logger.log_dir)
+            log_dir.mkdir(exist_ok=True, parents=True)
+            shutil.copy(Path(__file__), log_dir)
+
+            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                                min_delta=0.00,
+                                                mode='max',
+                                                patience=10,
+                                                verbose=False)
+
+            model_checkpoint = ModelCheckpoint(
+                    dirpath=(logger.log_dir + '/checkpoint/'),
+                    monitor='val_ap_epoch',
+                    mode='max',
+                    save_top_k=1,
+            )
+
+            X_test = X_data[test_index]
+            y_test = y_data[test_index]
             test_dataset = construct_dataset(X_test, y_test)
-            test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
+            test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func,
+                                     batch_size=conf.batch_size)
 
-            train_data = data.iloc[train_index]
+            train_set = X_data[train_index]
+            train_labels = y_data[train_index]
 
-            for train_index_2, val_index in train_val_splitter.split(train_data, train_data[withdrawn_col]):
-                X_val, y_val = load_data_from_smiles(train_data.iloc[val_index]['smiles'],
-                                                     train_data.iloc[val_index][withdrawn_col],
-                                                     one_hot_formal_charge=True)
-                val_dataset = construct_dataset(X_val, y_val)
-                val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
+            X_train, X_val, y_train, y_val = train_test_split(train_set, train_labels,
+                                                              test_size=0.15, stratify=train_labels, shuffle=True)
 
-                X_train, y_train = load_data_from_smiles(train_data.iloc[train_index_2]['smiles'],
-                                                         train_data.iloc[train_index_2][withdrawn_col],
-                                                         one_hot_formal_charge=True)
-                train_dataset = construct_dataset(X_train, y_train)
-                train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
-                                          batch_size=conf.batch_size)
+            val_dataset = construct_dataset(X_val, y_val)
+            val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
-                pos_weight = torch.Tensor([(train_data.iloc[train_index_2][withdrawn_col].value_counts()[0] /
-                                            train_data.iloc[train_index_2][withdrawn_col].value_counts()[1])])
+            train_dataset = construct_dataset(X_train, y_train)
+            train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
+                                      batch_size=conf.batch_size)
 
-                conf.pos_weight = pos_weight
+            pos_weight = torch.Tensor([(len(y_train) / np.count_nonzero(y_train))])
+            conf.pos_weight = pos_weight
 
-                model = TransformerNet(
-                    conf.to_hparams(),
-                    reduce_lr=conf.reduce_lr,
-                )
+            model = TransformerNet(
+                conf.to_hparams(),
+                reduce_lr=conf.reduce_lr,
+            )
 
-                print("Starting training")
-                trainer = pl.Trainer(
-                    max_epochs=conf.epochs,
-                    gpus=[gpu],  # [0]
-                    logger=logger,
-                    resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
-                    weights_summary='top',
-                    callbacks=[early_stop_callback],
-                    checkpoint_callback=ModelCheckpoint(
-                        dirpath=(logger.log_dir + '/checkpoint/'),
-                        monitor='val_ap_epoch',
-                        mode='max',
-                        save_top_k=1,
-                    ),
-                    deterministic=True,
-                    auto_lr_find=False,
-                    num_sanity_val_steps=0
-                )
+            print("Starting training")
+            trainer = pl.Trainer(
+                max_epochs=conf.epochs,
+                gpus=[gpu],  # [0]
+                logger=logger,  # load from checkpoint instead of resume
+                weights_summary='top',
+                callbacks=[early_stop_callback, model_checkpoint],
+                deterministic=True,
+                auto_lr_find=False,
+                num_sanity_val_steps=0
+            )
 
-                trainer.fit(model, train_loader, val_loader)
-                results = trainer.test(model, test_loader)
-                results_path = Path(root / "results")
-                test_ap = round(results[0]['test_ap'], 3)
-                test_auc = round(results[0]['test_auc'], 3)
-                cv_fold.append(k)
+            trainer.fit(model, train_loader, val_loader)
+            results = trainer.test(model, test_loader)
+            test_ap = round(results[0]['test_ap'], 3)
 
-                fold_ap.append(test_ap)
-                fold_auc_roc.append(test_auc)
+            fold_ap.append(test_ap)
 
-                if not results_path.exists():
-                    results_path.mkdir(exist_ok=True, parents=True)
-                    with open(results_path / "classification_results.txt", "w") as file:
-                        file.write("Classification results")
-                        file.write("\n")
+        return np.mean(fold_ap)
 
-                results = {'Test AP': test_ap,
-                           'Test AUC-ROC': test_auc,
-                           'CV_fold': cv_fold}
-                version = {'version': logger.version}
-                results = {logger.name: [results, version]}
-                with open(results_path / "classification_results.txt", "a") as file:
-                    print(results, file=file)
-                    file.write("\n")
+    res = gp_minimize(maximize_ap,  # the function to minimize
+                      param_space,  # the bounds on each dimension of x
+                      acq_func="EI",  # the acquisition function
+                      n_calls=5,  # the number of evaluations of f
+                      n_random_starts=5,  # the number of random initialization points
+                      random_state=1234)  # the random seed
 
-        print('Average AP across folds: {}'.format(np.mean(fold_ap)))
-        print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
-        print('\n')
-
-        for i, result in enumerate(fold_ap):
-            print('AP for fold {}= {}'.format(i, result))
-
-        for i, result in enumerate(fold_auc_roc):
-            print('AUC for fold {}= {}'.format(i, result))
-
-        results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-            results_path / "{}_metrics.csv".format(logger.version))
+    plot_convergence(res)
+    print('Value of the minimum: {}'.format(res.fun))
+    print('Res space: {}'.format(res.space))
 
 
 if __name__ == '__main__':
