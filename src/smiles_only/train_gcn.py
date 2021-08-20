@@ -233,7 +233,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         test = data.iloc[test_index]
         test_data_list = []
         for index, row in test.iterrows():
-            test_data_list.append(smiles2graph(row))
+            test_data_list.append(smiles2graph(row, withdrawn_col))
         test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
         train_set = data.iloc[train_index]
@@ -242,12 +242,12 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
         train_data_list = []
         for index, row in train.iterrows():
-            train_data_list.append(smiles2graph(row))
+            train_data_list.append(smiles2graph(row, withdrawn_col))
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
 
         val_data_list = []
         for index, row in val.iterrows():
-            val_data_list.append(smiles2graph(row))
+            val_data_list.append(smiles2graph(row, withdrawn_col))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
         pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
