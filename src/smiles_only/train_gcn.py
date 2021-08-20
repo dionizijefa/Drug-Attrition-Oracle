@@ -18,7 +18,6 @@ from torch_geometric.data import DataLoader
 import torch
 from data_utils import smiles2graph
 from EGConv import EGConvNet
-from transformer import make_model
 import click
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -39,7 +38,6 @@ class Conf:
     reduce_lr: Optional[bool] = False
     pos_weight: torch.Tensor = torch.Tensor([8])
     hidden_channels: int = 1024
-    input_dim: int = 6
     num_layers: int = 4
     num_heads: int = 8
     num_bases: int = 4
@@ -68,7 +66,6 @@ class TransformerNet(pl.LightningModule, ABC):
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
         self.model = EGConvNet(
-            self.hparams.input_dim,
             self.hparams.hidden_channels,
             self.hparams.num_layers,
             self.hparams.num_heads,
