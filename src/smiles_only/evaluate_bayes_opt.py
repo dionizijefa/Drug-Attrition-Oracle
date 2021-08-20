@@ -5,13 +5,13 @@ from pathlib import Path
 from pprint import pformat
 from time import time
 from typing import Dict, Optional
-import numpy as np
+
 import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torchmetrics.functional import average_precision, auroc
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch.utils.data import DataLoader
@@ -32,7 +32,7 @@ class Conf:
     use_16bit: bool = False
     save_dir = '{}/models/'.format(root)
     lr: float = 1e-4
-    batch_size: int = 16
+    batch_size: int = 32
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
@@ -68,22 +68,20 @@ class TransformerNet(pl.LightningModule, ABC):
             'N': 8,
             'h': 16,
             'N_dense': 1,
-            'lambda_attention': 0.12,
-            'lambda_distance': 0.23,
+            'lambda_attention': 0.33, #0.178
+            'lambda_distance': 0.33, #0.145
             'leaky_relu_slope': 0.1,
-            'dense_output_nonlinearity': 'relu',
+            'dense_output_nonlinearity': 'relu', #tanh
             'distance_matrix_kernel': 'exp',
             'dropout': 0.0,
-            'aggregation_type': 'mean',
+            'aggregation_type': 'mean'
         }
 
         self.model = make_model(**self.model_params)
-        pl.seed_everything(hparams['seed'])
-
-        """
         pretrained_name = root / 'pretrained_weights.pt'
         pretrained_state_dict = torch.load(pretrained_name)
-            
+        pl.seed_everything(hparams['seed'])
+
         model_state_dict = self.model.state_dict()
         for name, param in pretrained_state_dict.items():
             if 'generator' in name:
@@ -91,7 +89,7 @@ class TransformerNet(pl.LightningModule, ABC):
             if isinstance(param, torch.nn.Parameter):
                 param = param.data
             model_state_dict[name].copy_(param)
-        """
+
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
         out = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
         return out
@@ -190,86 +188,71 @@ class TransformerNet(pl.LightningModule, ABC):
 
     def get_progress_bar_dict(self):
         items = super().get_progress_bar_dict()
-        #version = self.trainer.logger.version[-10:]
-        #items["v_num"] = version
+        version = self.trainer.logger.version[-10:]
+        items["v_num"] = version
         return items
 
 @click.command()
-@click.option('-train_data', default='chembl_4_smiles.csv')
-@click.option('-dataset', default='all')
+@click.option('-train_data', default='chembl_train.csv')
+@click.option('-test_data', default='chembl_test.csv')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
-@click.option('-gpu', default=1)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu):
+@click.option('--gpu', default=1)
+def main(train_data, test_data, withdrawn_col, batch_size, gpu):
+    conf = Conf(
+        lr=1e-4,
+        batch_size=batch_size,
+        epochs=100,
+        reduce_lr=True,
+    )
 
-    if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
-        data = data.sample(frac=1, random_state=0)
+    logger = TensorBoardLogger(
+        conf.save_dir,
+        name='transformer_net',
+        version='{}'.format(str(int(time()))),
+    )
 
-    else:
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.loc[(data['dataset'] == dataset) |
-                        (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
-        data = data.sample(frac=1, random_state=0)
+    # Copy this script and all files used in training
+    log_dir = Path(logger.log_dir)
+    log_dir.mkdir(exist_ok=True, parents=True)
+    shutil.copy(Path(__file__), log_dir)
 
-    X_data, y_data = load_data_from_smiles(data['smiles'], data[withdrawn_col], one_hot_formal_charge=True)
-    X_data = np.array(X_data)
-    y_data = np.array(y_data)
+    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                        min_delta=0.00,
+                                        mode='max',
+                                        patience=15,
+                                        verbose=False)
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+    data = data.sample(frac=1, random_state=0)
 
-    fold_ap = []
-    fold_auc_roc = []
-    cv_fold = []
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['smiles', withdrawn_col]]
+    X_test, y_test = load_data_from_smiles(test_data['smiles'],
+                                         test_data[withdrawn_col],
+                                         one_hot_formal_charge=True)
+    test_dataset = construct_dataset(X_test, y_test)
+    test_loader = DataLoader(test_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
-    for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(X_data, y_data)
-    ):
+    train_val_splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.15)
 
-        conf = Conf(
-            lr=1e-4,
-            batch_size=batch_size,
-            epochs=100,
-            reduce_lr=True,
-        )
-
-        logger = TensorBoardLogger(
-            conf.save_dir,
-            name='transformer_net',
-            version='{}'.format(str(int(time()))),
-        )
-
-        # Copy this script and all files used in training
-        log_dir = Path(logger.log_dir)
-        log_dir.mkdir(exist_ok=True, parents=True)
-        shutil.copy(Path(__file__), log_dir)
-
-        early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                            min_delta=0.00,
-                                            mode='max',
-                                            patience=15,
-                                            verbose=False)
-
-        X_test = X_data[test_index]
-        y_test = y_data[test_index]
-        test_dataset = construct_dataset(X_test, y_test)
-        test_loader = DataLoader(test_dataset, num_workers=0, collate_fn=mol_collate_func, batch_size=conf.batch_size)
-
-        train_set = X_data[train_index]
-        train_labels = y_data[train_index]
-
-        X_train, X_val, y_train, y_val = train_test_split(train_set,train_labels,
-                                                          test_size=0.15, stratify=train_labels, shuffle=True)
-
+    for train_index, val_index in train_val_splitter.split(data, data[withdrawn_col]):
+        X_val, y_val = load_data_from_smiles(data.iloc[val_index]['smiles'],
+                                             data.iloc[val_index][withdrawn_col],
+                                             one_hot_formal_charge=True)
         val_dataset = construct_dataset(X_val, y_val)
         val_loader = DataLoader(val_dataset, collate_fn=mol_collate_func, num_workers=0, batch_size=conf.batch_size)
 
+        X_train, y_train = load_data_from_smiles(data.iloc[train_index]['smiles'],
+                                                 data.iloc[train_index][withdrawn_col],
+                                                 one_hot_formal_charge=True)
         train_dataset = construct_dataset(X_train, y_train)
         train_loader = DataLoader(train_dataset, collate_fn=mol_collate_func, num_workers=0,
                                   batch_size=conf.batch_size)
 
-        pos_weight = torch.Tensor([(len(y_train) / np.count_nonzero(y_train))])
+
+        pos_weight = torch.Tensor([(data.iloc[train_index][withdrawn_col].value_counts()[0] /
+                                    data.iloc[train_index][withdrawn_col].value_counts()[1])])
+
         conf.pos_weight = pos_weight
 
         model = TransformerNet(
@@ -277,19 +260,21 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             reduce_lr=conf.reduce_lr,
         )
 
-        print("Starting training")
-        trainer = pl.Trainer(
-            max_epochs=conf.epochs,
-            gpus=[gpu],  # [0]
-            logger=logger,  # load from checkpoint instead of resume
-            weights_summary='top',
-            callbacks=[early_stop_callback],
-            checkpoint_callback=ModelCheckpoint(
+        model_checkpoint = ModelCheckpoint(
                 dirpath=(logger.log_dir + '/checkpoint/'),
                 monitor='val_ap_epoch',
                 mode='max',
                 save_top_k=1,
-            ),
+        )
+
+        print("Starting training")
+        trainer = pl.Trainer(
+            max_epochs=conf.epochs,
+            gpus=[gpu],  # [0]
+            logger=logger,
+            resume_from_checkpoint=conf.ckpt_path,  # load from checkpoint instead of resume
+            weights_summary='top',
+            callbacks=[early_stop_callback, model_checkpoint],
             deterministic=True,
             auto_lr_find=False,
             num_sanity_val_steps=0
@@ -297,41 +282,26 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
         trainer.fit(model, train_loader, val_loader)
         results = trainer.test(model, test_loader)
-        results_path = Path(root / "results")
+
         test_ap = round(results[0]['test_ap'], 3)
         test_auc = round(results[0]['test_auc'], 3)
-        cv_fold.append(k)
 
-        fold_ap.append(test_ap)
-        fold_auc_roc.append(test_auc)
+        print('Test Average AP: {}'.format(test_ap))
+        print('Test ROC-AUC: {}'.format(test_auc))
 
+        results_path = Path(root / "results")
         if not results_path.exists():
             results_path.mkdir(exist_ok=True, parents=True)
-            with open(results_path / "classification_results.txt", "w") as file:
-                file.write("Classification results")
+            with open(results_path / "production_results.txt", "w") as file:
+                file.write("Production version")
                 file.write("\n")
 
-        results = {'Test AP': test_ap,
-                   'Test AUC-ROC': test_auc,
-                   'CV_fold': cv_fold}
+
         version = {'version': logger.version}
-        results = {logger.name: [results, version]}
-        with open(results_path / "classification_results.txt", "a") as file:
+        results = {logger.name: version}
+        with open(results_path / "production_results.txt", "a") as file:
             print(results, file=file)
             file.write("\n")
-
-    print('Average AP across folds: {}'.format(np.mean(fold_ap)))
-    print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
-    print('\n')
-
-    for i, result in enumerate(fold_ap):
-        print('AP for fold {}= {}'.format(i, result))
-
-    for i, result in enumerate(fold_auc_roc):
-        print('AUC for fold {}= {}'.format(i, result))
-
-    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-        results_path / "{}_metrics.csv".format(logger.version))
 
 
 if __name__ == '__main__':

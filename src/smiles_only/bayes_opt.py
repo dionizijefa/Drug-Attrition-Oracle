@@ -35,21 +35,21 @@ class Conf:
     seed: int = 42
     use_16bit: bool = False
     save_dir = '{}/models/'.format(root)
-    lr: float = 0.0005
-    batch_size: int = 32
+    lr: float = 1e-4
+    batch_size: int = 16
     epochs: int = 100
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
-    d_model: int = 64
-    N: int = 4
-    h: int = 8
+    d_model: int = 1024
+    N: int = 8
+    h: int = 16
     N_dense: int = 2
     lambda_attention: float = 0.33
     lambda_distance: float = 0.33
     leaky_relu_slope: int = 0.1
-    distance_matrix_kernel: str = 'softmax'
+    distance_matrix_kernel: str = 'exp'
     dropout: float = 0.0
-    dense_output_nonlinearity: str = 'tanh'
+    dense_output_nonlinearity: str = 'relu'
     pos_weight: torch.Tensor = torch.Tensor([8])
 
 
@@ -79,21 +79,36 @@ class TransformerNet(pl.LightningModule, ABC):
         self.reduce_lr = reduce_lr
         self.model_params = {
             'd_atom': 28,
-            'd_model': self.hparams.d_model,
-            'N': self.hparams.N,
-            'h': self.hparams.h,
-            'N_dense': self.hparams.N_dense,
+            'd_model': 1024,
+            'N': 8,
+            'h': 16,
+            'N_dense': 1,
             'lambda_attention': self.hparams.lambda_attention,
             'lambda_distance': self.hparams.lambda_distance,
-            'leaky_relu_slope': self.hparams.leaky_relu_slope,
+            'leaky_relu_slope': 0.1,
             'dense_output_nonlinearity': self.hparams.dense_output_nonlinearity,
             'distance_matrix_kernel': self.hparams.distance_matrix_kernel,
-            'dropout': self.hparams.dropout,
+            'dropout': 0.0,
             'aggregation_type': 'mean',
+            'n_output': 1,
         }
 
-        pl.seed_everything(hparams['seed'])
         self.model = make_model(**self.model_params)
+        pl.seed_everything(hparams['seed'])
+
+        """
+        pretrained_name = root / 'pretrained_weights.pt'
+        pretrained_state_dict = torch.load(pretrained_name)
+        pl.seed_everything(hparams['seed'])
+
+        model_state_dict = self.model.state_dict()
+        for name, param in pretrained_state_dict.items():
+            if 'generator' in name:
+                continue
+            if isinstance(param, torch.nn.Parameter):
+                param = param.data
+            model_state_dict[name].copy_(param)
+        """
 
     def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
         out = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
@@ -220,41 +235,15 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     X_data = np.array(X_data)
     y_data = np.array(y_data)
 
-    """
-    param_space = {
-        'lr': Real(0.0005, 0.01, name='lr'),
-        'd_model': Integer(28, 1024, name='d_model'),
-        'N': Integer(1, 16, name='N'),
-        'h': Integer(1, 16, name='h'),
-        'N_dense': Integer(1, 4, name='N_dense'),
-        'lambda_attention': Real(0.1, 0.9, name='lambda_attention'),
-        'lambda_distance': Real(0.1, 0.9, name='lambda_distance'),
-        'leaky_relu_slope': Real(0.01, 0.5, name='leaky_relu_slope'),
-        'distance_matrix_kernel': Categorical(['exp', 'softmax'], name='distance_matrix_kernel'),
-        'dropout': Real(0.05, 0.5, name='dropout'),
-        'dense_output_nonlinearity': Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
-    }
-    """
-
-    dim_1 = Real(0.0005, 0.01, name='lr')
-    dim_2 = Categorical([32, 64, 128, 256, 512, 1024], name='d_model')
-    dim_3 = Integer(2, 16, name='N')
-    dim_4 = Categorical([4, 8, 16], name='h')
-    dim_5 = Integer(1, 6, name='N_dense')
+    dim_4 = Categorical(['exp', 'softmax'], name='distance_matrix_kernel')
+    dim_5 = Categorical(['relu', 'tanh'], name='dense_output_nonlinearity')
     dim_6 = Real(0.1, 0.9, name='lambda_attention')
     dim_7 = Real(0.1, 0.9, name='lambda_distance')
-    dim_8 = Real(0.01, 0.5, name='leaky_relu_slope')
-    dim_9 = Categorical(['exp', 'softmax'], name='distance_matrix_kernel')
-    dim_10 = Real(0.05, 0.5, name='dropout')
-    dim_11 = Categorical(['tanh', 'relu'], name='dense_output_nonlinearity')
-
-    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5,
-                  dim_6, dim_7, dim_8, dim_9, dim_10, dim_11]
+    dimensions = [dim_4, dim_5, dim_6, dim_7]
 
     @use_named_args(dimensions=dimensions)
-    def maximize_ap(lr, d_model, N, h, N_dense, lambda_attention, lambda_distance, leaky_relu_slope,
-                    distance_matrix_kernel, dropout, dense_output_nonlinearity):
-        train_test_splitter = StratifiedKFold(n_splits=2)
+    def maximize_ap(distance_matrix_kernel, dense_output_nonlinearity, lambda_attention, lambda_distance):
+        train_test_splitter = StratifiedKFold(n_splits=5)
 
         fold_ap = []
 
@@ -263,19 +252,12 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         ):
 
             conf = Conf(
-                lr=lr,
                 batch_size=batch_size,
                 reduce_lr=True,
-                d_model=d_model,
-                N=N,
-                h=h,
-                N_dense=N_dense,
+                distance_matrix_kernel=distance_matrix_kernel,
+                dense_output_nonlinearity=dense_output_nonlinearity,
                 lambda_attention=lambda_attention,
                 lambda_distance=lambda_distance,
-                leaky_relu_slope=leaky_relu_slope,
-                dense_output_nonlinearity=dense_output_nonlinearity,
-                distance_matrix_kernel=distance_matrix_kernel,
-                dropout=dropout,
             )
 
             logger = TensorBoardLogger(
@@ -353,14 +335,14 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
     res = gp_minimize(maximize_ap,  # the function to minimize
                       dimensions=dimensions,  # the bounds on each dimension of x
                       acq_func="EI",  # the acquisition function
-                      n_calls=20,  # the number of evaluations of f
+                      n_calls=25,  # the number of evaluations of f
                       n_random_starts=5,  # the number of random initialization points
                       random_state=1234)  # the random seed
     end = time()
     elapsed = (end-start) / 3600
 
     print('Value of the minimum: {}'.format(res.fun))
-    print('Res space: {}'.format(res.space))
+    print('Res space: {}'.format(res.x))
     print('Time elapsed in hrs: {}'.format(elapsed))
 
     results_path = Path(root / 'bayes_opt')
