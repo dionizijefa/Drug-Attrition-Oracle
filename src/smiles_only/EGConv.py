@@ -50,13 +50,13 @@ class EGConvNet(Module):
             Linear(hidden_channels // 4, 1),
         )
 
-    def forward(self, x, adj_t, batch):
+    def forward(self, x, edge_index, batch):
         # EGConv works without any edge features
 
         x = self.encoder(x)
 
         for conv, norm in zip(self.convs, self.norms):
-            h = conv(x, adj_t)
+            h = conv(x, edge_index)
             h = norm(h)
             h = h.relu_()
             x = x + h

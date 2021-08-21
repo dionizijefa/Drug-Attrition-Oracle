@@ -369,7 +369,7 @@ def smiles2graph(data, withdrawn_col):
     graph = dict()
     graph['edge_index'] = torch.Tensor(edge_index).long()
     graph['edge_attr'] = torch.Tensor(edge_attr)
-    graph['node_feat'] = torch.Tensor(x)
+    graph['node_feat'] = torch.Tensor(x).long()
     graph['num_nodes'] = torch.Tensor(len(x))
     graph['y'] = torch.Tensor(y)
 

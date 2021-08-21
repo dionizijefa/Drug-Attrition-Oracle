@@ -75,7 +75,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pl.seed_everything(hparams['seed'])
 
     def forward(self, data):
-        out = self.model(data.x, data.edge_attr, data.batch, None)
+        out = self.model(data.x, data.edge_index, data.batch, None)
         return out
 
     def training_step(self, batch, batch_idx):
@@ -134,7 +134,7 @@ class TransformerNet(pl.LightningModule, ABC):
         self.log_dict(log_metrics)
 
     def shared_step(self, data, batchidx):
-        y_hat = self.model(data.x, data.edge_attr, data.batch)
+        y_hat = self.model(data.x, data.edge_index, data.batch)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, data.y)
