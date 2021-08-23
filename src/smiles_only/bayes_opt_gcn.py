@@ -10,12 +10,16 @@ import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from skopt import gp_minimize
+from skopt.plots import plot_convergence
+from skopt.space import Integer, Real, Categorical
 from torchmetrics.functional import average_precision, auroc
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit, train_test_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch_geometric.data import DataLoader
 import torch
+from skopt.utils import use_named_args
 from data_utils import smiles2graph
 from EGConv import EGConvNet
 import click
@@ -33,14 +37,15 @@ class Conf:
     save_dir = '{}/models/'.format(root)
     lr: float = 1e-4
     batch_size: int = 16
-    epochs: int = 300
+    epochs: int = 100
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
-    pos_weight: torch.Tensor = torch.Tensor([8])
     hidden_channels: int = 1024
     num_layers: int = 4
     num_heads: int = 8
     num_bases: int = 4
+    pos_weight: torch.Tensor = torch.Tensor([8])
+
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -55,6 +60,7 @@ class Conf:
 
     def __str__(self):
         return pformat(dataclasses.asdict(self))
+
 
 class TransformerNet(pl.LightningModule, ABC):
     def __init__(
@@ -169,13 +175,11 @@ class TransformerNet(pl.LightningModule, ABC):
 
     def get_progress_bar_dict(self):
         items = super().get_progress_bar_dict()
-        # version = self.trainer.logger.version[-10:]
-        # items["v_num"] = version
         return items
 
 
 @click.command()
-@click.option('-train_data', default='chembl_4_smiles.csv')
+@click.option('-train_data', default='chembl_train.csv')
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
@@ -192,125 +196,129 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                         (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
         data = data.sample(frac=1, random_state=0)
 
+    dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
+    dim_2 = Integer(1, 8, name='num_layers')
+    dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
+    dim_4 = Integer(1, 8, name='num_bases')
+    dimensions = [dim_1, dim_2, dim_3, dim_4]
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    @use_named_args(dimensions=dimensions)
+    def maximize_ap(hidden_channels, num_layers, num_heads, num_bases):
+        train_test_splitter = StratifiedKFold(n_splits=5)
 
-    fold_ap = []
-    fold_auc_roc = []
-    cv_fold = []
+        fold_ap = []
 
-    for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data[withdrawn_col])
-    ):
+        for k, (train_index, test_index) in enumerate(
+                train_test_splitter.split(data, data[withdrawn_col])
+        ):
 
-        conf = Conf(
-            lr=1e-4,
-            batch_size=batch_size,
-            epochs=100,
-            reduce_lr=True,
-        )
+            conf = Conf(
+                batch_size=batch_size,
+                reduce_lr=True,
+                hidden_channels=hidden_channels,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                num_bases=num_bases,
+            )
 
-        logger = TensorBoardLogger(
-            conf.save_dir,
-            name='transformer_net',
-            version='{}'.format(str(int(time()))),
-        )
+            logger = TensorBoardLogger(
+                conf.save_dir,
+                name='transformer_net',
+                version='{}'.format(str(int(time()))),
+            )
 
-        # Copy this script and all files used in training
-        log_dir = Path(logger.log_dir)
-        log_dir.mkdir(exist_ok=True, parents=True)
-        shutil.copy(Path(__file__), log_dir)
+            # Copy this script and all files used in training
+            log_dir = Path(logger.log_dir)
+            log_dir.mkdir(exist_ok=True, parents=True)
+            shutil.copy(Path(__file__), log_dir)
 
-        early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                            min_delta=0.00,
-                                            mode='max',
-                                            patience=15,
-                                            verbose=False)
+            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                                min_delta=0.00,
+                                                mode='max',
+                                                patience=10,
+                                                verbose=False)
 
-        test = data.iloc[test_index]
-        test_data_list = []
-        for index, row in test.iterrows():
-            test_data_list.append(smiles2graph(row, withdrawn_col))
-        test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
+            model_checkpoint = ModelCheckpoint(
+                    dirpath=(logger.log_dir + '/checkpoint/'),
+                    monitor='val_ap_epoch',
+                    mode='max',
+                    save_top_k=1,
+            )
 
-        train_set = data.iloc[train_index]
+            test = data.iloc[test_index]
+            test_data_list = []
+            for index, row in test.iterrows():
+                test_data_list.append(smiles2graph(row, withdrawn_col))
+            test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
+            train_set = data.iloc[train_index]
 
-        train_data_list = []
-        for index, row in train.iterrows():
-            train_data_list.append(smiles2graph(row, withdrawn_col))
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
+            train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
 
-        val_data_list = []
-        for index, row in val.iterrows():
-            val_data_list.append(smiles2graph(row, withdrawn_col))
-        val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
+            train_data_list = []
+            for index, row in train.iterrows():
+                train_data_list.append(smiles2graph(row, withdrawn_col))
+            train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
-        conf.pos_weight = pos_weight
+            val_data_list = []
+            for index, row in val.iterrows():
+                val_data_list.append(smiles2graph(row, withdrawn_col))
+            val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        model = TransformerNet(
-            conf.to_hparams(),
-            reduce_lr=conf.reduce_lr,
-        )
+            pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
+            conf.pos_weight = pos_weight
 
-        print("Starting training")
-        trainer = pl.Trainer(
-            max_epochs=conf.epochs,
-            gpus=[gpu],  # [0]
-            logger=logger,  # load from checkpoint instead of resume
-            weights_summary='top',
-            callbacks=[early_stop_callback],
-            checkpoint_callback=ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-            ),
-            deterministic=True,
-            auto_lr_find=False,
-            num_sanity_val_steps=0
-        )
+            model = TransformerNet(
+                conf.to_hparams(),
+                reduce_lr=conf.reduce_lr,
+            )
 
-        trainer.fit(model, train_loader, val_loader)
-        results = trainer.test(model, test_loader)
-        results_path = Path(root / "results")
-        test_ap = round(results[0]['test_ap'], 3)
-        test_auc = round(results[0]['test_auc'], 3)
-        cv_fold.append(k)
+            print("Starting training")
+            trainer = pl.Trainer(
+                max_epochs=conf.epochs,
+                gpus=[gpu],  # [0]
+                logger=logger,  # load from checkpoint instead of resume
+                weights_summary='top',
+                callbacks=[early_stop_callback, model_checkpoint],
+                deterministic=True,
+                auto_lr_find=False,
+                num_sanity_val_steps=0
+            )
 
-        fold_ap.append(test_ap)
-        fold_auc_roc.append(test_auc)
+            trainer.fit(model, train_loader, val_loader)
+            results = trainer.test(model, test_loader)
+            test_ap = round(results[0]['test_ap'], 3)
 
-        if not results_path.exists():
-            results_path.mkdir(exist_ok=True, parents=True)
-            with open(results_path / "classification_results.txt", "w") as file:
-                file.write("Classification results")
-                file.write("\n")
+            fold_ap.append(test_ap)
 
-        results = {'Test AP': test_ap,
-                   'Test AUC-ROC': test_auc,
-                   'CV_fold': cv_fold}
-        version = {'version': logger.version}
-        results = {logger.name: [results, version]}
-        with open(results_path / "classification_results.txt", "a") as file:
-            print(results, file=file)
+        return 1/np.mean(fold_ap)
+
+    start = time()
+    res = gp_minimize(maximize_ap,  # the function to minimize
+                      dimensions=dimensions,  # the bounds on each dimension of x
+                      acq_func="EI",  # the acquisition function
+                      n_calls=25,  # the number of evaluations of f
+                      n_random_starts=5,  # the number of random initialization points
+                      random_state=1234)  # the random seed
+    end = time()
+    elapsed = (end-start) / 3600
+
+    print('Value of the minimum: {}'.format(res.fun))
+    print('Res space: {}'.format(res.x))
+    print('Time elapsed in hrs: {}'.format(elapsed))
+
+    results_path = Path(root / 'bayes_opt')
+    if not results_path.exists():
+        results_path.mkdir(exist_ok=True, parents=True)
+        with open(results_path / "bayes_opt.txt", "w") as file:
+            file.write("Bayes opt")
             file.write("\n")
 
-    print('Average AP across folds: {}'.format(np.mean(fold_ap)))
-    print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
-    print('\n')
-
-    for i, result in enumerate(fold_ap):
-        print('AP for fold {}= {}'.format(i, result))
-
-    for i, result in enumerate(fold_auc_roc):
-        print('AUC for fold {}= {}'.format(i, result))
-
-    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-        results_path / "{}_metrics.csv".format(logger.version))
-
+        with open(results_path / "bayes_opt.txt", "a") as file:
+            print('Maximum AP: {}'.format(res.fun), file=file)
+            print('Res space: {}'.format(res.space), file=file)
+            file.write("\n")
+            file.write("\n")
 
 if __name__ == '__main__':
     main()

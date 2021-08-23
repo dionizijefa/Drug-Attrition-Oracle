@@ -14,7 +14,7 @@ from torchmetrics.functional import average_precision, auroc
 from sklearn.model_selection import StratifiedShuffleSplit
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch_geometric.data import DataLoader
 import torch
 from src.smiles_only.data_utils import construct_dataset, load_data_from_smiles, mol_collate_func
 from transformer import make_model
@@ -37,6 +37,10 @@ class Conf:
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
     pos_weight: torch.Tensor = torch.Tensor([8])
+    hidden_channels: int = 1024
+    num_layers: int = 4
+    num_heads: int = 8
+    num_bases: int = 4
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -62,36 +66,17 @@ class TransformerNet(pl.LightningModule, ABC):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model_params = {
-            'd_atom': 28,
-            'd_model': 1024,
-            'N': 8,
-            'h': 16,
-            'N_dense': 1,
-            'lambda_attention': 0.33,
-            'lambda_distance': 0.33,
-            'leaky_relu_slope': 0.1,
-            'dense_output_nonlinearity': 'relu',
-            'distance_matrix_kernel': 'exp',
-            'dropout': 0.0,
-            'aggregation_type': 'mean'
-        }
-
-        self.model = make_model(**self.model_params)
-        pretrained_name = root / 'pretrained_weights.pt'
-        pretrained_state_dict = torch.load(pretrained_name)
+        self.model = EGConvNet(
+            self.hparams.hidden_channels,
+            self.hparams.num_layers,
+            self.hparams.num_heads,
+            self.hparams.num_bases,
+            aggregator=['sum', 'mean', 'max']
+        )
         pl.seed_everything(hparams['seed'])
 
-        model_state_dict = self.model.state_dict()
-        for name, param in pretrained_state_dict.items():
-            if 'generator' in name:
-                continue
-            if isinstance(param, torch.nn.Parameter):
-                param = param.data
-            model_state_dict[name].copy_(param)
-
-    def forward(self, node_features, batch_mask, adjacency_matrix, distance_matrix):
-        out = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+    def forward(self, data):
+        out = self.model(data.x, data.edge_index, data.batch, None)
         return out
 
     def training_step(self, batch, batch_idx):
@@ -149,19 +134,16 @@ class TransformerNet(pl.LightningModule, ABC):
         }
         self.log_dict(log_metrics)
 
-    def shared_step(self, batch, batchidx):
-        adjacency_matrix, node_features, distance_matrix, y = batch
-        batch_mask = torch.sum(torch.abs(node_features), dim=-1) != 0
-        # y_hat = self.forward(node_features, batch_mask, adjacency_matrix, distance_matrix)
-        y_hat = self.model(node_features, batch_mask, adjacency_matrix, distance_matrix, None)
+    def shared_step(self, data, batchidx):
+        y_hat = self.model(data.x, data.edge_index, data.batch)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        loss = loss_fn(y_hat, y)
+        loss = loss_fn(y_hat, data.y.unsqueeze(-1))
 
         return {
             'loss': loss,
             'predictions': y_hat,
-            'targets': y.int(),
+            'targets': data.y.unsqueeze(-1).long(),
         }
 
     def configure_optimizers(self):
@@ -188,8 +170,6 @@ class TransformerNet(pl.LightningModule, ABC):
 
     def get_progress_bar_dict(self):
         items = super().get_progress_bar_dict()
-        version = self.trainer.logger.version[-10:]
-        items["v_num"] = version
         return items
 
 @click.command()
