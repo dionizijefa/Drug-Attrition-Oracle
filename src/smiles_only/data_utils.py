@@ -350,44 +350,65 @@ def smiles2graph(data, withdrawn_col):
     donor = []
     acceptor = []
     features = []
+    names = []
+    donor_string = []
 
     for atom in mol.GetAtoms():
+        atom_feature_names = []
         atom_features = []
         atom_features += one_hot_vector(
             atom.GetAtomicNum(),
             [5, 6, 7, 8, 9, 15, 16, 17, 35, 53, 999]
         )
 
+        atom_feature_names.append(atom.GetSymbol())
         atom_features += one_hot_vector(
             atom.GetTotalNumHs(),
             [0, 1, 2, 3, 4]
         )
+        atom_feature_names.append(atom.GetTotalNumHs())
         atom_features += one_hot_vector(
             atom.GetHybridization(),
             [HybridizationType.S, HybridizationType.SP, HybridizationType.SP2, HybridizationType.SP3,
-             HybridizationType.SP3D, HybridizationType.SP3D2]
+             HybridizationType.SP3D, HybridizationType.SP3D2, HybridizationType.UNSPECIFIED]
         )
-        atom_features += one_hot_vector(
-            atom.GetChiralTag(),
-            ['CHI_UNSPECIFIED', 'CHI_TETRAHEDRAL_CW', 'CHI_TETRAHEDRAL_CCW', 'CHI_OTHER']
-        )
+        atom_feature_names.append(atom.GetHybridization().__str__())
+
         atom_features.append(atom.IsInRing())
         atom_features.append(atom.GetIsAromatic())
+
+        if atom.GetIsAromatic() == 1:
+            atom_feature_names.append('Aromatic')
+        else:
+            atom_feature_names.append('Non-aromatic')
+
+        if atom.IsInRing() == 1:
+            atom_feature_names.append('Is in ring')
+        else:
+            atom_feature_names.append('Not in ring')
+
         donor.append(0)
         acceptor.append(0)
+
+        donor_string.append('Not a donor or acceptor')
+
         atom_features = np.array(atom_features, dtype=int)
+        atom_feature_names = np.array(atom_feature_names, dtype=object)
         features.append(atom_features)
+        names.append(atom_feature_names)
 
     feats = factory.GetFeaturesForMol(mol)
     for j in range(0, len(feats)):
         if feats[j].GetFamily() == 'Donor':
             node_list = feats[j].GetAtomIds()
             for k in node_list:
-                donor[k] = 1
+                donor[k] = 0
+                donor_string[k] = 'Donor'
         elif feats[j].GetFamily() == 'Acceptor':
             node_list = feats[j].GetAtomIds()
             for k in node_list:
                 acceptor[k] = 1
+                donor_string[k] = 'Acceptor'
 
     features = np.array(features, dtype=int)
     donor = np.array(donor, dtype=int)
@@ -396,6 +417,13 @@ def smiles2graph(data, withdrawn_col):
     acceptor = acceptor[..., np.newaxis]
     x = np.append(features, donor, axis=1)
     x = np.append(x, acceptor, axis=1)
+
+
+    donor_string = np.array(donor_string, dtype=object)
+    donor_string = donor_string[..., np.newaxis]
+
+    names = np.array(names, dtype=object)
+    names = np.append(names, donor_string, axis=1)
 
 
     # bonds
@@ -420,5 +448,6 @@ def smiles2graph(data, withdrawn_col):
     graph['edge_index'] = torch.Tensor(edge_index).long()
     graph['node_feat'] = torch.Tensor(x).long()
     graph['y'] = torch.Tensor([y])
+    graph['feature_names'] = names
 
-    return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'])
+    return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names)
