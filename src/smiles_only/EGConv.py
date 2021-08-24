@@ -31,7 +31,7 @@ class EGConvNet(Module):
     def __init__(self, hidden_channels, num_layers, num_heads, num_bases, aggregator):
         super().__init__()
 
-        self.conv1 = EGConv(27, hidden_channels, aggregator, num_heads, num_bases)
+        self.lin1 = Linear(27, hidden_channels)
         self.norm1 = BatchNorm1d(hidden_channels)
 
         self.convs = ModuleList()
@@ -53,11 +53,10 @@ class EGConvNet(Module):
         )
 
     def forward(self, x, edge_index, batch):
-        #x = torch.tensor(x).to(torch.int64)
-        h = self.conv1(x, edge_index)
-        h = self.norm1(h)
-        h = h.relu_()
-        x = x + h
+        #x = torch.tensor(x).to(torch.int64) za GNN explainer
+        x = self.lin1(x)
+        x = self.norm1(x)
+        x = x.relu_()
 
         for conv, norm in zip(self.convs, self.norms):
             h = conv(x, edge_index)
