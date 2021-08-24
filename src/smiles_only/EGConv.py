@@ -1,3 +1,4 @@
+import torch
 from ogb.utils.features import get_atom_feature_dims
 from torch_geometric.nn import EGConv, global_mean_pool
 from torch.nn import Sequential, BatchNorm1d, ReLU, Linear, Module, Embedding, ModuleList
@@ -5,6 +6,7 @@ from torch.nn.init import xavier_uniform_
 
 full_atom_feature_dims = get_atom_feature_dims()
 
+"""
 class AtomEncoder(Module):
     def __init__(self, emb_dim):
         super(AtomEncoder, self).__init__()
@@ -22,6 +24,7 @@ class AtomEncoder(Module):
             x_embedding += self.atom_embedding_list[i](x[:, i])
 
         return x_embedding
+"""
 
 
 class EGConvNet(Module):
@@ -30,7 +33,7 @@ class EGConvNet(Module):
     def __init__(self, hidden_channels, num_layers, num_heads, num_bases, aggregator):
         super().__init__()
 
-        self.encoder = AtomEncoder(hidden_channels)
+        #self.encoder = AtomEncoder(hidden_channels)
 
         self.convs = ModuleList()
         self.norms = ModuleList()
@@ -52,9 +55,8 @@ class EGConvNet(Module):
 
     def forward(self, x, edge_index, batch):
         # EGConv works without any edge features
-
+        x = torch.tensor(x).to(torch.int64)
         x = self.encoder(x)
-
         for conv, norm in zip(self.convs, self.norms):
             h = conv(x, edge_index)
             h = norm(h)
