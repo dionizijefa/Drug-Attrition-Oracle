@@ -291,7 +291,7 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
         num_sanity_val_steps=0
     )
 
-    nonconform_adapter = ClassifierAdapter(trainer)
+    nonconform_adapter = ClassifierAdapter(trainer, model)
     nc = NcFactory.create_nc(nonconform_adapter)
     icp = IcpClassifier(nc)
 
