@@ -187,10 +187,10 @@ def main(train_data, test_data, withdrawn_col, batch_size, gpu):
     conf = Conf(
         batch_size=batch_size,
         reduce_lr=True,
-        hidden_channels=2048,
-        num_layers=2,
-        num_heads=4,
-        num_bases=7,
+        hidden_channels=512,
+        num_layers=7,
+        num_heads=2,
+        num_bases=4,
     )
 
     logger = TensorBoardLogger(
