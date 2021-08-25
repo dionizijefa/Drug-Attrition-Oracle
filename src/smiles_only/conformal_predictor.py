@@ -30,13 +30,13 @@ class ClassifierAdapter(RegressorAdapter):
     def __init__(self, trainer, model):
         super(ClassifierAdapter, self).__init__(trainer, model)
 
-    def fit(self, loader):
+    def fit(self, train_loader, val_loader):
         # train self.model using (x, y) as training data
-        self.trainer.fit(self.model, loader)
+        self.trainer.fit(self.model, train_loader, val_loader)
 
-    def _underlying_predict(self, loader):
+    def _underlying_predict(self, test_loader):
         self.model.eval()
-        predictions = self.model.forward()
+        predictions = self.model.forward(test_loader)
         return predictions
 
         # obtain predictions from self.model and fill `predictions`
@@ -252,6 +252,7 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     for index, row in train.iterrows():
         calibration_data_list.append(smiles2graph(row, withdrawn_col))
     calibration_loader = DataLoader(calibration_data_list, num_workers=0, batch_size=conf.batch_size)
+    y_calibration = calibration[withdrawn_col]
 
     train, val = train_test_split(train, test_size=0.15, stratify=train[withdrawn_col], shuffle=True)
 
@@ -296,6 +297,6 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     icp = IcpClassifier(nc)
 
     icp.fit(train_loader)
-    icp.calibrate(calibration_loader)
-    prediction = icp.predict(test_loader)
+    icp.calibrate(calibration_loader, y_calibration)
+    prediction = icp.predict(test_loader, significance=0.05)
     print(prediction)
