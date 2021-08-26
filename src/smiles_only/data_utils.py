@@ -335,15 +335,15 @@ def one_hot_vector(val, lst):
         val = lst[-1]
     return map(lambda x: x == val, lst)
 
-def smiles2graph(data, withdrawn_col):
+def smiles2graph(smiles, withdrawn_col):
     """
     Converts SMILES string to graph Data object
     :input: SMILES string (str)
     :return: graph object
     """
 
-    smiles = data['smiles']
-    y = data[withdrawn_col]
+    smiles = smiles
+    y = withdrawn_col
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms
