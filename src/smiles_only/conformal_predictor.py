@@ -264,8 +264,8 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
 
     train, calibration = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], shuffle=True)
 
-    calibration = np.array(calibration)
     y_calibration = np.array(calibration[withdrawn_col])
+    calibration = np.array(calibration)
 
     train, val = train_test_split(train, test_size=0.15, stratify=train[withdrawn_col], shuffle=True)
 
@@ -300,8 +300,8 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     icp = IcpClassifier(nc)
 
     icp.fit(train, val)
-    icp.calibrate(calibration_loader, y_calibration)
-    prediction = icp.predict(test_loader, significance=0.05)
+    icp.calibrate(calibration, y_calibration)
+    prediction = icp.predict(test, significance=0.05)
     print(prediction)
 
 if __name__ == '__main__':
