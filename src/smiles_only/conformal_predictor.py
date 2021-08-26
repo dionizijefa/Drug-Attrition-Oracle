@@ -28,7 +28,9 @@ root = Path(__file__).resolve().parents[2].absolute()
 
 class ClassifierAdapter(RegressorAdapter):
     def __init__(self, trainer, model):
-        super(ClassifierAdapter, self).__init__(trainer, model)
+        super(ClassifierAdapter, self).__init__(model)
+        self.trainer = trainer
+        self.model = model
 
     def fit(self, train_loader, val_loader):
         # train self.model using (x, y) as training data
@@ -36,8 +38,12 @@ class ClassifierAdapter(RegressorAdapter):
 
     def _underlying_predict(self, test_loader):
         self.model.eval()
-        predictions = self.model.forward(test_loader)
-        return predictions
+        predictions = []
+        for batch in test_loader:
+            prediction = self.model.forward(batch).cpu().detach().numpy()
+            prediction = list(prediction)
+            predictions.append(prediction)
+        return np.array(predictions)
 
         # obtain predictions from self.model and fill `predictions`
         # appropriately, with one real-valued prediction per
@@ -97,7 +103,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pl.seed_everything(hparams['seed'])
 
     def forward(self, data):
-        out = self.model(data.x, data.edge_index, data.batch, None)
+        out = self.model(data.x, data.edge_index, data.batch)
         return out
 
     def training_step(self, batch, batch_idx):
@@ -293,10 +299,13 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     )
 
     nonconform_adapter = ClassifierAdapter(trainer, model)
-    nc = NcFactory.create_nc(nonconform_adapter)
+    nc = ClassifierNc(nonconform_adapter)
     icp = IcpClassifier(nc)
 
-    icp.fit(train_loader)
+    icp.fit(train_loader, val_loader)
     icp.calibrate(calibration_loader, y_calibration)
     prediction = icp.predict(test_loader, significance=0.05)
     print(prediction)
+
+if __name__ == '__main__':
+    main()
