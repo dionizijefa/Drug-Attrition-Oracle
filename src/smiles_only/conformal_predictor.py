@@ -27,21 +27,36 @@ root = Path(__file__).resolve().parents[2].absolute()
 
 
 class ClassifierAdapter(RegressorAdapter):
-    def __init__(self, trainer, model):
+    def __init__(self, trainer, model, batch_size):
         super(ClassifierAdapter, self).__init__(model)
         self.trainer = trainer
         self.model = model
+        self.batch_size = batch_size
 
-    def fit(self, train_loader, val_loader):
-        # train self.model using (x, y) as training data
+    def fit(self, train, val):
+        train_data_list = []
+        for index, row in train.iterrows():
+            train_data_list.append(smiles2graph(row, 'withdrawn'))
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=self.batch_size)
+
+        val_data_list = []
+        for index, row in val.iterrows():
+            val_data_list.append(smiles2graph(row, 'withdrawn'))
+        val_loader = DataLoader(val_data_list, num_workers=0, batch_size=self.batch_size)
+
+
         self.trainer.fit(self.model, train_loader, val_loader)
 
-    def _underlying_predict(self, test_loader):
+    def _underlying_predict(self, test):
         self.model.eval()
         predictions = []
+        test_data_list = []
+        for index, row in test.iterrows():
+            test_data_list.append(smiles2graph(row, 'withdrawn'))
+        test_loader = DataLoader(test_data_list, num_workers=0, batch_size=self.batch_size)
+
         for batch in test_loader:
-            prediction = self.model.forward(batch).cpu().detach().numpy()
-            prediction = list(prediction)
+            prediction = self.model.forward(batch).cpu().detach()
             predictions.append(prediction)
         return np.array(predictions)
 
@@ -247,30 +262,12 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    test_data_list = []
-    for index, row in test.iterrows():
-        test_data_list.append(smiles2graph(row, withdrawn_col))
-    test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
-
     train, calibration = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], shuffle=True)
 
-    calibration_data_list = []
-    for index, row in train.iterrows():
-        calibration_data_list.append(smiles2graph(row, withdrawn_col))
-    calibration_loader = DataLoader(calibration_data_list, num_workers=0, batch_size=conf.batch_size)
-    y_calibration = calibration[withdrawn_col]
+    calibration = np.array(calibration)
+    y_calibration = np.array(calibration[withdrawn_col])
 
     train, val = train_test_split(train, test_size=0.15, stratify=train[withdrawn_col], shuffle=True)
-
-    train_data_list = []
-    for index, row in train.iterrows():
-        train_data_list.append(smiles2graph(row, withdrawn_col))
-    train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
-
-    val_data_list = []
-    for index, row in val.iterrows():
-        val_data_list.append(smiles2graph(row, withdrawn_col))
-    val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
     pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
     conf.pos_weight = pos_weight
@@ -298,11 +295,11 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
         num_sanity_val_steps=0
     )
 
-    nonconform_adapter = ClassifierAdapter(trainer, model)
+    nonconform_adapter = ClassifierAdapter(trainer, model, conf.batch_size)
     nc = ClassifierNc(nonconform_adapter)
     icp = IcpClassifier(nc)
 
-    icp.fit(train_loader, val_loader)
+    icp.fit(train, val)
     icp.calibrate(calibration_loader, y_calibration)
     prediction = icp.predict(test_loader, significance=0.05)
     print(prediction)
