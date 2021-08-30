@@ -16,8 +16,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch_geometric.data import DataLoader
 import torch
-from data_utils import smiles2graph
-from EGConv import EGConvNet
+from data_utils import smiles2graph_descriptors
+from EGConv_descriptors import EGConv
 import click
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -41,6 +41,8 @@ class Conf:
     num_layers: int = 4
     num_heads: int = 8
     num_bases: int = 4
+    descriptors_len: int = 476
+
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -65,7 +67,8 @@ class TransformerNet(pl.LightningModule, ABC):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model = EGConvNet(
+        self.model = EGConv(
+            self.hparams.descriptors_len,
             self.hparams.hidden_channels,
             self.hparams.num_layers,
             self.hparams.num_heads,
@@ -179,8 +182,9 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='withdrawn')
 @click.option('-batch_size', default=16)
+@click.option('-descriptors_from', default=9)
 @click.option('-gpu', default=1)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu):
+def main(train_data, dataset, withdrawn_col, descriptors_from, batch_size, gpu):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
         data = data.sample(frac=1, random_state=0)
@@ -230,7 +234,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         test = data.iloc[test_index]
         test_data_list = []
         for index, row in test.iterrows():
-            test_data_list.append(smiles2graph(row, withdrawn_col))
+            test_data_list.append(smiles2graph_descriptors(row, withdrawn_col, descriptors_from=descriptors_from))
         test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
         train_set = data.iloc[train_index]
@@ -239,12 +243,12 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
         train_data_list = []
         for index, row in train.iterrows():
-            train_data_list.append(smiles2graph(row, withdrawn_col))
+            train_data_list.append(smiles2graph_descriptors(row, withdrawn_col, descriptors_from=descriptors_from))
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
 
         val_data_list = []
         for index, row in val.iterrows():
-            val_data_list.append(smiles2graph(row, withdrawn_col))
+            val_data_list.append(smiles2graph_descriptors(row, withdrawn_col, descriptors_from=descriptors_from))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
         pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
