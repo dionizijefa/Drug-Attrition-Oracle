@@ -69,7 +69,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pl.seed_everything(hparams['seed'])
 
     def forward(self, descriptors):
-        out = self.model(descriptors)
+        out = self.model(descriptors[0])
         return out
 
     def training_step(self, batch, batch_idx):
@@ -127,8 +127,9 @@ class TransformerNet(pl.LightningModule, ABC):
         }
         self.log_dict(log_metrics)
 
-    def shared_step(self, descriptors, y):
-        y_hat = self.model(descriptors)
+    def shared_step(self, descriptors, batch):
+        y_hat = self.model(descriptors[0])
+        y = descriptors[1]
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, y.unsqueeze(-1))
@@ -177,18 +178,18 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-descriptors_from', default=9)
 def main(train_data, dataset, withdrawn_col, descriptors_from, batch_size, gpu):
     if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+        data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
         data = data.sample(frac=1, random_state=0)
 
     else:
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
+        data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
         data = data.loc[(data['dataset'] == dataset) |
                         (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
+                        (data['dataset'] == 'withdrawn')]
         data = data.sample(frac=1, random_state=0)
 
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_test_splitter = StratifiedKFold(n_splits=5, random_state=0)
 
     fold_ap = []
     fold_auc_roc = []
@@ -223,24 +224,25 @@ def main(train_data, dataset, withdrawn_col, descriptors_from, batch_size, gpu):
                                             verbose=False)
 
         test = data.iloc[test_index]
-        test_descriptors = torch.Tensor([np.array(test)[:, descriptors_from:]])
-        test_y = torch.Tensor([np.array(test[withdrawn_col])])
+        test_descriptors = torch.Tensor(np.array(test.iloc[:, descriptors_from:]))
+        test_y = torch.Tensor(np.array(test[withdrawn_col]))
         test_dataset = TensorDataset(test_descriptors, test_y)
-        test_loader = DataLoader(test_dataset)
+        test_loader = DataLoader(test_dataset, num_workers=0, batch_size=conf.batch_size)
 
         train_set = data.iloc[train_index]
 
-        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
+        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True,
+                                      random_state=0)
 
-        val_descriptors = torch.Tensor([np.array(val)[:, descriptors_from:]])
-        val_y = torch.Tensor([np.array(val[withdrawn_col])])
+        val_descriptors = torch.Tensor(np.array(val.iloc[:, descriptors_from:]))
+        val_y = torch.Tensor(np.array(val[withdrawn_col]))
         val_dataset = TensorDataset(val_descriptors, val_y)
-        val_loader = DataLoader(val_dataset)
+        val_loader = DataLoader(val_dataset, num_workers=0, batch_size=conf.batch_size)
 
-        train_descriptors = torch.Tensor([np.array(train)[:, descriptors_from:]])
-        train_y = torch.Tensor([np.array(train[withdrawn_col])])
+        train_descriptors = torch.Tensor(np.array(train.iloc[:, descriptors_from:]))
+        train_y = torch.Tensor(np.array(train[withdrawn_col]))
         train_dataset = TensorDataset(train_descriptors, train_y)
-        train_loader = DataLoader(train_dataset)
+        train_loader = DataLoader(train_dataset, num_workers=0, batch_size=conf.batch_size)
 
         pos_weight = torch.Tensor([(len(train) / len(train.loc[train[withdrawn_col] == 1]))])
         conf.pos_weight = pos_weight

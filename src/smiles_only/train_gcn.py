@@ -193,7 +193,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
         data = data.sample(frac=1, random_state=0)
 
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_test_splitter = StratifiedKFold(n_splits=5, random_state=0)
 
     fold_ap = []
     fold_auc_roc = []
@@ -235,7 +235,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
         train_set = data.iloc[train_index]
 
-        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
+        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True,
+                                      random_state=0)
 
         train_data_list = []
         for index, row in train.iterrows():
@@ -247,7 +248,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             val_data_list.append(smiles2graph(row, withdrawn_col))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
+        pos_weight = torch.Tensor([(len(train) / len(train.loc[train[withdrawn_col] == 1]))])
         conf.pos_weight = pos_weight
 
         model = TransformerNet(
