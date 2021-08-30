@@ -187,7 +187,7 @@ def main(train_data, test_data, withdrawn_col, batch_size, gpu):
     conf = Conf(
         batch_size=batch_size,
         reduce_lr=True,
-        hidden_channels=512,
+        hidden_channels=16,
         num_layers=7,
         num_heads=2,
         num_bases=4,

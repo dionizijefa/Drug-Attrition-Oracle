@@ -9,12 +9,11 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 from nonconformist.icp import IcpClassifier
-from nonconformist.cp import TcpClassifier
 from nonconformist.acp import CrossSampler, AggregatedCp, CrossConformalClassifier
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from torchmetrics.functional import average_precision, auroc
-from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split, KFold
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import Adam
 from torch_geometric.data import DataLoader
@@ -23,53 +22,23 @@ from data_utils import smiles2graph
 from EGConv import EGConvNet
 import click
 from nonconformist.base import ClassifierAdapter
-from nonconformist.nc import ClassifierNc, MarginErrFunc
-from sklearn.metrics import average_precision_score
-from nonconformist.evaluation import class_mean_errors
+from nonconformist.nc import ClassifierNc, MarginErrFunc, InverseProbabilityErrFunc
 
 root = Path(__file__).resolve().parents[2].absolute()
 
-class TcpClassifier(TcpClassifier):
-    def __init__(self, nc_function, condition=None, smoothing=True):
-        self.train_x, self.train_y = None, None
-        self.nc_function = nc_function
-        super(TcpClassifier, self).__init__()
 
-        # Check if condition-parameter is the default function (i.e.,
-        # lambda x: 0). This is so we can safely clone the object without
-        # the clone accidentally having self.conditional = True.
-        default_condition = lambda x: 0
-        is_default = (callable(condition) and
-                      (condition.__code__.co_code ==
-                       default_condition.__code__.co_code))
+class CrossSampler(object):
 
-        if is_default:
-            self.condition = condition
-            self.conditional = False
-        elif callable(condition):
-            self.condition = condition
-            self.conditional = True
+    def gen_samples(self, y, n_samples, problem_type):
+        if problem_type == 'classification':
+            folds = StratifiedKFold(n_splits=n_samples)
+            split_ = folds.split(np.zeros((y.size, 1)), y)
         else:
-            self.condition = lambda x: 0
-            self.conditional = False
+            folds = KFold(n_splits=n_samples)
+            split_ = folds.split(np.zeros((y.size, 1)))
 
-        self.smoothing = smoothing
-
-        self.base_icp = IcpClassifier(
-            self.nc_function,
-            self.condition,
-            self.smoothing
-        )
-
-        self.classes = None
-
-    def fit(self, train):
-        self.train_x = train
-        self.train_y = train['withdrawn']
-        self.classes = np.unique(train['withdrawn'])
-
-class
-
+        for train, cal in split_:
+            yield train, cal
 
 class ClassifierAdapter(ClassifierAdapter):
     def __init__(self, trainer, model, batch_size):
@@ -78,17 +47,18 @@ class ClassifierAdapter(ClassifierAdapter):
         self.model = model
         self.batch_size = batch_size
 
-    def fit(self, train, val):
+    def fit(self, x_train, y_train):
+        X_train, X_val, y_train, y_test = train_test_split(x_train, y_train, test_size=0.15,
+                                          shuffle=True, random_state=0, stratify=y_train)
         train_data_list = []
-        for row in train:
+        for row in X_train:
             train_data_list.append(smiles2graph(row[0], row[1]))
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=self.batch_size)
 
         val_data_list = []
-        for row in val:
+        for row in X_val:
             val_data_list.append(smiles2graph(row[0], row[1]))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=self.batch_size)
-
 
         self.trainer.fit(self.model, train_loader, val_loader)
 
@@ -104,9 +74,7 @@ class ClassifierAdapter(ClassifierAdapter):
             prediction = self.model.forward(batch).cpu().detach().numpy()
             predictions.append(prediction)
 
-        predictions = np.array([cell for row in predictions for cell in row]) # flatten the list
-        odds = np.exp(predictions)
-        predictions = odds / (1 + odds)
+        predictions = np.array([cell for row in predictions for cell in row])  # flatten the list
         return predictions
 
         # obtain predictions from self.model and fill `predictions`
@@ -312,23 +280,11 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
                                         patience=15,
                                         verbose=False)
 
-    """
-    train, calibration = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], shuffle=True,
-                                          random_state=conf.seed)
-
-    y_calibration = np.array(calibration[withdrawn_col])
-    calibration = np.array(calibration)
-    """
-
-    train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], shuffle=True,
-                                  random_state=conf.seed)
-    pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
+    pos_weight = torch.Tensor([(len(data) / len(data.loc[data['withdrawn'] == 1]))])
     conf.pos_weight = pos_weight
 
-    train = np.array(train)
-    y_val = np.array(val[withdrawn_col])
-    val = np.array(val)
-
+    y_data = np.array(data[withdrawn_col])
+    data = np.array(data)
 
     model = TransformerNet(
         conf.to_hparams(),
@@ -354,18 +310,12 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     )
 
     nonconform_adapter = ClassifierAdapter(trainer, model, conf.batch_size)
-    nc = ClassifierNc(nonconform_adapter, MarginErrFunc())
+    nc = ClassifierNc(nonconform_adapter, InverseProbabilityErrFunc())
     icp = IcpClassifier(nc, condition=lambda x: x[1])
-    ccp = CrossConformalClassifier(icp, CrossSampler())
+    ccp = AggregatedCp(icp, CrossSampler())
 
-    ccp.fit(train, val)
-    ccp.calibrate(val, y_val)
-    prediction = icp.predict_conf(test)
-    significance = icp.predict(test, significance=0.1)
-
-    significance = pd.DataFrame(significance)
-    significance.rename(columns={0: 'class_0', 1: 'class_1'}, inplace=True)
-
+    ccp.fit(data, y_data)
+    prediction = ccp.predict(test, significance=0.3)
 
     test_data_list = []
     y_test = []
@@ -383,15 +333,12 @@ def main(train_data, test_data, dataset, withdrawn_col, batch_size, gpu):
     prediction = pd.DataFrame(prediction)
     prediction['y_true'] = y_test
     prediction['model_outputs'] = model_outputs
-    prediction['class_0'] = significance['class_0']
-    prediction['class_1'] = significance['class_1']
-
 
     results_path = Path(root / "results")
     prediction.to_csv(results_path / "mondrian_prediction.csv")
 
-    error_rate = class_mean_errors(icp.predict(test), np.array(y_test), significance=0.1)
-    print('Error rate: {}'.format(error_rate))
+    #error_rate = class_mean_errors(ccp.predict(test, significance=0.3), np.array(y_test))
+    #print('Error rate: {}'.format(error_rate))
 
 
 if __name__ == '__main__':

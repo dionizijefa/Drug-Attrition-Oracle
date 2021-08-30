@@ -342,8 +342,11 @@ def smiles2graph(smiles, withdrawn_col):
     :return: graph object
     """
 
-    smiles = smiles
-    y = withdrawn_col
+    #smiles = smiles
+    #y = withdrawn_col
+
+    y = smiles[withdrawn_col]
+    smiles = smiles['smiles']
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms
