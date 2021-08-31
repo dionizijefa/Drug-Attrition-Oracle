@@ -6,122 +6,7 @@ from chembl_webresource_client.new_client import new_client
 from pathlib import Path
 import click
 
-def process_drugbank(data, dataset, phase):
-    molecule = new_client.molecule
-    data_list_of_features = ['molecule_type', 'structure_type', 'therapeutic_flag', 'molecule_chembl_id',
-                                 'max_phase', 'atc_classifications',
-                                 'chirality', 'prodrug', 'oral', 'parenteral', 'topical', 'black_box_warning',
-                                 'availability_type', 'withdrawn_year',
-                                 'withdrawn_reason', 'withdrawn_country', 'withdrawn_class', 'molecule_type',
-                                 'structure_type', 'therapeutic_flag']
-    data_list_of_properties = ['alogp', 'aromatic_rings', 'cx_logd', 'cx_logp', 'cx_most_apka', 'cx_most_bpka',
-                                   'full_mwt', 'hba', 'hba_lipinski',
-                                   'hbd', 'hbd_lipinski', 'heavy_atoms', 'molecular_species', 'mw_freebase',
-                                   'mw_monoisotopic', 'num_lipinski_ro5_violations',
-                                   'num_ro5_violations', 'psa', 'qed_weighted', 'ro3_pass', 'rtb']
-    for i in data_list_of_features:
-        data[i] = 'missing'
-    for i in data_list_of_properties:
-        data[i] = 'missing'
-
-    data['parent_chembl_id'] = 'missing'
-    data['parent_smiles'] = 'missing'
-    data['parent_inchi_key'] = 'missing'
-
-    if dataset == 'drugbank':
-        key = 'inchi_key'
-    else:
-        key = 'chembl_id'
-    for mol in tqdm(list(data[key]), position=0, leave=True):
-        try:
-            res = new_client.molecule.get(mol)
-            # add features
-            index = data.loc[data[key] == mol].index.values[0]
-            for feature in data_list_of_features:
-                if feature == 'atc_classifications' and not res[feature]:
-                    data.at[index, feature] = None
-                elif feature == 'atc_classifications' and res[feature]:
-                    data.at[index, feature] = '+'.join(res[feature])
-                else:
-                    data.at[index, feature] = res[feature]
-
-                # add properties
-                try:
-                    for prop in data_list_of_properties:
-                        data.at[index, prop] = res['molecule_properties'][prop]
-                except TypeError:
-                    print('No properties for molecule {}'.format(mol))
-
-                # try to add smiles if exists
-                try:
-                    if data.loc[data[key] == mol]['smiles'].values[0] == 'missing':
-                        smiles = res['molecule_structures']['canonical_smiles']
-                        data.at[index, 'canonical_smiles'] = smiles
-                except TypeError:
-                    print('No smiles for molecule {}'.format(mol))
-
-                # add parent molecule
-                try:
-                    parent_mol = res['molecule_hierarchy']['parent_chembl_id']
-                    data.at[index, 'parent_chembl_id'] = parent_mol
-                except TypeError:
-                    continue
-                # check if parent has smiles
-                try:
-                    parent_res = molecule.get(parent_mol)
-                    parent_smiles = parent_res['molecule_structures']['canonical_smiles']
-                    parent_inchi_key = parent_res['molecule_structures']['standard_inchi_key']
-                    data.at[index, 'parent_smiles'] = parent_smiles
-                    data.at[index, 'parent_inchi_key'] = parent_inchi_key
-                except:
-                    print('No parent smiles for molecule {}'.format(mol))
-
-        except Exception as e:
-            print(e)
-            print("Molecule {} doesn't exist".format(mol))
-
-    data['action_type'] = 'missing'
-    data['direct_interaction'] = 'missing'
-    data['disease_efficacy'] = 'missing'
-    data['molecular_mechanism'] = 'missing'
-    data['target_chembl_id'] = 'missing'
-
-    for molecule in tqdm(list(data['molecule_chembl_id'])):
-        for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
-            if mechanism['max_phase'] == phase:
-                for i in mechanism_list:
-                    if data.loc[data['molecule_chembl_id'] == molecule][i].values[0] == 'missing':
-                        data.loc[data['molecule_chembl_id'] == molecule, i] = mechanism[i]
-                    else:
-                        old_label = data.loc[data['molecule_chembl_id'] == molecule][i].values[0]
-                        data.loc[data['molecule_chembl_id'] == molecule, i] = '{}+{}'.format(old_label,
-                                                                                                     mechanism[i])
-
-    data = data.loc[(data['max_phase'] >= phase)]
-    data['chembl_tox'] = 'Safe'
-    for effect in toxic_dict:
-        for molecule in toxic_dict[effect]:
-            try:
-                old_label = data.loc[data['molecule_chembl_id'] == molecule]['chembl_tox'].values[0]
-            except IndexError:
-                print('Mol {} not in the set'.format(molecule))
-            if old_label == 'Safe':
-                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = effect
-            else:
-                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
-
-    if dataset == 'drugbank':
-        data['dataset'] = 'drugbank'
-        data['withdrawn'] = 0
-        data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn'] = 1
-        data = data.loc[~data['smiles'].isna()] # drop data which doesn't contain smiles
-        data.to_csv('/home/dionizije/Documents/temp/drugbank_min_phase_{}.csv'.format(phase))
-
-    if dataset == 'withdrawn':
-        data['dataset'] = 'withdrawn'
-        data['withdrawn'] = 1
-        data.to_csv('/home/dionizije/Documents/temp/withdrawn_min_phase_{}.csv'.format(phase))
-
+data_path = Path(__file__).resolve().parents[1].absolute()
 toxic_carcinogenic = ['CHEMBL103', 'CHEMBL1200430', 'CHEMBL1200686', 'CHEMBL1200973',
                       'CHEMBL1201314', 'CHEMBL1201572', 'CHEMBL1201581', 'CHEMBL1201866',
                       'CHEMBL1220', 'CHEMBL135', 'CHEMBL137', 'CHEMBL1393', 'CHEMBL1456',
@@ -272,11 +157,126 @@ toxic_dict = {"toxic_carcinogenic": toxic_carcinogenic, "toxic_cardio": toxic_ca
 mechanism_list = ['action_type', 'direct_interaction', 'disease_efficacy', 'molecular_mechanism',
                   'target_chembl_id']
 
+def process_drugbank(data, dataset, phase):
+    molecule = new_client.molecule
+    data_list_of_features = ['molecule_type', 'structure_type', 'therapeutic_flag', 'molecule_chembl_id',
+                                 'max_phase', 'atc_classifications',
+                                 'chirality', 'prodrug', 'oral', 'parenteral', 'topical', 'black_box_warning',
+                                 'availability_type', 'withdrawn_year',
+                                 'withdrawn_reason', 'withdrawn_country', 'withdrawn_class', 'molecule_type',
+                                 'structure_type', 'therapeutic_flag']
+    data_list_of_properties = ['alogp', 'aromatic_rings', 'cx_logd', 'cx_logp', 'cx_most_apka', 'cx_most_bpka',
+                                   'full_mwt', 'hba', 'hba_lipinski',
+                                   'hbd', 'hbd_lipinski', 'heavy_atoms', 'molecular_species', 'mw_freebase',
+                                   'mw_monoisotopic', 'num_lipinski_ro5_violations',
+                                   'num_ro5_violations', 'psa', 'qed_weighted', 'ro3_pass', 'rtb']
+    for i in data_list_of_features:
+        data[i] = 'missing'
+    for i in data_list_of_properties:
+        data[i] = 'missing'
+
+    data['parent_chembl_id'] = 'missing'
+    data['parent_smiles'] = 'missing'
+    data['parent_inchi_key'] = 'missing'
+
+    if dataset == 'drugbank':
+        key = 'inchi_key'
+    else:
+        key = 'chembl_id'
+    for mol in tqdm(list(data[key]), position=0, leave=True):
+        try:
+            res = new_client.molecule.get(mol)
+            # add features
+            index = data.loc[data[key] == mol].index.values[0]
+            for feature in data_list_of_features:
+                if feature == 'atc_classifications' and not res[feature]:
+                    data.at[index, feature] = None
+                elif feature == 'atc_classifications' and res[feature]:
+                    data.at[index, feature] = '+'.join(res[feature])
+                else:
+                    data.at[index, feature] = res[feature]
+
+                # add properties
+                try:
+                    for prop in data_list_of_properties:
+                        data.at[index, prop] = res['molecule_properties'][prop]
+                except TypeError:
+                    print('No properties for molecule {}'.format(mol))
+
+                # try to add smiles if exists
+                try:
+                    if data.loc[data[key] == mol]['smiles'].values[0] == 'missing':
+                        smiles = res['molecule_structures']['canonical_smiles']
+                        data.at[index, 'canonical_smiles'] = smiles
+                except TypeError:
+                    print('No smiles for molecule {}'.format(mol))
+
+                # add parent molecule
+                try:
+                    parent_mol = res['molecule_hierarchy']['parent_chembl_id']
+                    data.at[index, 'parent_chembl_id'] = parent_mol
+                except TypeError:
+                    continue
+                # check if parent has smiles
+                try:
+                    parent_res = molecule.get(parent_mol)
+                    parent_smiles = parent_res['molecule_structures']['canonical_smiles']
+                    parent_inchi_key = parent_res['molecule_structures']['standard_inchi_key']
+                    data.at[index, 'parent_smiles'] = parent_smiles
+                    data.at[index, 'parent_inchi_key'] = parent_inchi_key
+                except:
+                    print('No parent smiles for molecule {}'.format(mol))
+
+        except Exception as e:
+            print(e)
+            print("Molecule {} doesn't exist".format(mol))
+
+    data['action_type'] = 'missing'
+    data['direct_interaction'] = 'missing'
+    data['disease_efficacy'] = 'missing'
+    data['molecular_mechanism'] = 'missing'
+    data['target_chembl_id'] = 'missing'
+
+    for molecule in tqdm(list(data['molecule_chembl_id'])):
+        for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
+            if mechanism['max_phase'] == phase:
+                for i in mechanism_list:
+                    if data.loc[data['molecule_chembl_id'] == molecule][i].values[0] == 'missing':
+                        data.loc[data['molecule_chembl_id'] == molecule, i] = mechanism[i]
+                    else:
+                        old_label = data.loc[data['molecule_chembl_id'] == molecule][i].values[0]
+                        data.loc[data['molecule_chembl_id'] == molecule, i] = '{}+{}'.format(old_label,
+                                                                                                     mechanism[i])
+
+    data = data.loc[(data['max_phase'] >= phase)]
+    data['chembl_tox'] = 'Safe'
+    for effect in toxic_dict:
+        for molecule in toxic_dict[effect]:
+            try:
+                old_label = data.loc[data['molecule_chembl_id'] == molecule]['chembl_tox'].values[0]
+            except IndexError:
+                print('Mol {} not in the set'.format(molecule))
+            if old_label == 'Safe':
+                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = effect
+            else:
+                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
+
+    if dataset == 'drugbank':
+        data['dataset'] = 'drugbank'
+        data['withdrawn'] = 0
+        data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn'] = 1
+        data = data.loc[~data['smiles'].isna()] # drop data which doesn't contain smiles
+        data.to_csv(data_path / 'data/drugbank_min_phase_{}.csv'.format(phase))
+
+    if dataset == 'withdrawn':
+        data['dataset'] = 'withdrawn'
+        data['withdrawn'] = 1
+        data.to_csv(data_path / 'data/withdrawn_min_phase_{}.csv'.format(phase))
+
 
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data_path = Path(__file__).resolve().parents[1].absolute()
     data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
 
     """
