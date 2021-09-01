@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from rdkit.Chem.PandasTools import LoadSDF
 import pubchempy as pcp
@@ -268,26 +269,27 @@ def process_drugbank(data, dataset, phase):
                 else:
                     data.loc[data[key] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
             except IndexError:
-                print('Toxic Mol {} not in the set'.format(molecule))
+                continue
 
     if dataset == 'drugbank':
-        data['dataset'] = 'drugbank'
+        data.rename(columns={'molecule_chembl_id': 'chembl_id'}, inplace=True)
         data['withdrawn_drugbank'] = 0
         data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn_drugbank'] = 1
         data = data.loc[~data['smiles'].isna()] # drop data which doesn't contain smiles
-        data.to_csv(data_path / 'data/drugbank_min_phase_{}.csv'.format(phase))
+        data.to_csv(data_path / 'data/processing_pipeline/drugbank_min_phase_{}.csv'.format(phase))
 
     if dataset == 'withdrawn':
-        data['dataset'] = 'withdrawn'
+        data.rename(columns={'canonical_smiles': 'smiles'}, inplace=True)
         data['withdrawn_withdrawn'] = 1
-        data.to_csv(data_path / 'data/withdrawn_min_phase_{}.csv'.format(phase))
+        data.to_csv(data_path / 'data/processing_pipeline/withdrawn_min_phase_{}.csv'.format(phase))
+
+    return data
 
 
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)[:20]
-
+    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
     """
     Preprocess chembl
         1) Drop polymer and inorganic molecules
@@ -418,7 +420,7 @@ def preprocess(phase):
                 else:
                     data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
             except IndexError:
-                print('Toxic Mol {} not in the set'.format(molecule))
+                continue
     print('Finished adding toxicity')
 
 
@@ -459,10 +461,9 @@ def preprocess(phase):
 
     data['withdrawn_chembl'] = 0
     data.loc[data['availability_type'] == 'Withdrawn', 'withdrawn_chembl'] = 1
-    data['dataset'] = 'chembl'
-    data.to_csv('drugbank_min_phase_{}.csv'.format(phase))
+    data.to_csv(data_path / 'data/processing_pipeline/chembl_min_phase_{}.csv'.format(phase))
 
-    """ Load drugbank data - all drugbank molecules not found in chembl are discarded"""
+    """ Load and proccess drugbank and withdrawn data"""
     drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')
     drugbank = drugbank[['DrugBank ID', 'InChIKey', 'Drug Groups', 'SMILES', 'Name']]
     drugbank.rename(columns={'DrugBank ID': 'drugbank_id',
@@ -471,11 +472,65 @@ def preprocess(phase):
                              'SMILES': 'smiles',
                              'Name': 'synonyms'}, inplace=True)
 
-    """ Load withdrawn data - all withdrawn molecule not found in chembl are discarded """
-    withdrawn = pd.read_csv(data_path / 'data/raw/withdrawn.csv')
+    withdrawn_input = pd.read_csv(data_path / 'data/raw/withdrawn.csv')
 
-    process_drugbank(drugbank[:20], 'drugbank', phase)
-    process_drugbank(withdrawn[:20], 'withdrawn', phase)
+    drugbank = process_drugbank(drugbank, 'drugbank', phase)
+    withdrawn = process_drugbank(withdrawn_input, 'withdrawn', phase)
+
+    """Merge data"""
+    columns = set(drugbank.columns).intersection(set(drugbank.columns))
+    columns = set(columns).intersection(set(withdrawn.columns))
+
+    all_data = pd.concat([data, drugbank, withdrawn])
+
+    all_data.drop(columns=all_data.columns.difference(columns), inplace=True)
+
+    all_data['withdrawn_chembl'] = np.nan
+    all_data['withdrawn_drugbank'] = np.nan
+    all_data['withdrawn_withdrawn'] = 0  # because wd contains only withdrawn, there would be too many NANs
+
+    databases = {'withdrawn_chembl': data,
+                'withdrawn_drugbank': drugbank,
+                'withdrawn_withdrawn': withdrawn}
+
+    for i in databases.keys():
+        for chembl_id in databases[i]['chembl_id']:
+            label = databases[i].loc[databases[i]['chembl_id'] == chembl_id][i]
+            all_data.loc[all_data['chembl_id'] == chembl_id, i] = label
+
+    all_data['withdrawn_tox'] = 'Safe'
+    for chembl_id in all_data['chembl_id']:
+        withdrawn_tox = withdrawn_input.loc[withdrawn_input['chembl_id'] == chembl_id]['toxicity_type']
+        all_data.loc[all_data['chembl_id'] == chembl_id, 'withdrawn_tox'] = withdrawn_tox
+
+    # drop duplicates from all_data
+    all_data.dropna(subset=['smiles'], inplace=True)
+    all_data.drop_duplicates(subset=['smiles'], inplace=True)
+
+    all_data['wd_consensus_1'] = 0
+    all_data['wd_consensus_2'] = 0
+    all_data['wd_consensus_3'] = 0
+
+
+    for index, row in all_data.iterrows():
+        chembl_id = row['chembl_id']
+        withdrawn_label = row['withdrawn_withdrawn']
+        drugbank_label = row['withdrawn_drugbank']
+        chembl_label = row['withdrawn_chembl']
+        if np.isnan(drugbank_label):
+            drugbank_label = 0
+        if np.isnan(chembl_label):
+            chembl_label = 0
+        consensus = withdrawn_label + drugbank_label + chembl_label
+        if consensus == 1:
+            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_1'] = 1
+        if consensus == 2:
+            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_2'] = 1
+        if consensus == 3:
+            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_3'] = 1
+
+
+    all_data.to_csv(data_path / 'data/processing_pipeline/alldata_min_phase_{}.csv'.format(phase))
 
 
 if __name__ == "__main__":

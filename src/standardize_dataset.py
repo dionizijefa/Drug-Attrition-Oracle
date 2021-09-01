@@ -21,4 +21,5 @@ def standardise_dataset(data: pd.DataFrame):
     # drop molecule which can't be standardized
     data = data.drop(columns=['smiles'])
     data['smiles'] = standardized_smiles
-    data['scaffolds'] = scaffolds_
+    data['scaffolds'] = scaffolds_generic
+
