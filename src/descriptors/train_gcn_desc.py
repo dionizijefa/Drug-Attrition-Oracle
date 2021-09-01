@@ -17,7 +17,7 @@ from torch.optim import Adam
 from torch_geometric.data import DataLoader
 import torch
 from data_utils import smiles2graph_descriptors
-from EGConv_descriptors import EGConv
+from EGConv_descriptors import EGConvNet
 import click
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -67,7 +67,7 @@ class TransformerNet(pl.LightningModule, ABC):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model = EGConv(
+        self.model = EGConvNet(
             self.hparams.descriptors_len,
             self.hparams.hidden_channels,
             self.hparams.num_layers,
@@ -78,7 +78,7 @@ class TransformerNet(pl.LightningModule, ABC):
         pl.seed_everything(hparams['seed'])
 
     def forward(self, data):
-        out = self.model(data.x, data.edge_index, data.batch, None)
+        out = self.model(data.x, data.edge_index, data.batch, data.descriptors)
         return out
 
     def training_step(self, batch, batch_idx):
@@ -137,7 +137,7 @@ class TransformerNet(pl.LightningModule, ABC):
         self.log_dict(log_metrics)
 
     def shared_step(self, data, batchidx):
-        y_hat = self.model(data.x, data.edge_index, data.batch)
+        y_hat = self.model(data.x, data.edge_index, data.batch, data.descriptors)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         loss = loss_fn(y_hat, data.y.unsqueeze(-1))
@@ -186,18 +186,18 @@ class TransformerNet(pl.LightningModule, ABC):
 @click.option('-gpu', default=1)
 def main(train_data, dataset, withdrawn_col, descriptors_from, batch_size, gpu):
     if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
+        data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
         data = data.sample(frac=1, random_state=0)
 
     else:
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
+        data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
         data = data.loc[(data['dataset'] == dataset) |
                         (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
+                        (data['dataset'] == 'withdrawn')]
         data = data.sample(frac=1, random_state=0)
 
 
-    train_test_splitter = StratifiedKFold(n_splits=5)
+    train_test_splitter = StratifiedKFold(n_splits=5, random_state=0)
 
     fold_ap = []
     fold_auc_roc = []
@@ -239,19 +239,20 @@ def main(train_data, dataset, withdrawn_col, descriptors_from, batch_size, gpu):
 
         train_set = data.iloc[train_index]
 
-        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
+        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True,
+                                      random_state=0)
 
         train_data_list = []
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph_descriptors(row, withdrawn_col, descriptors_from=descriptors_from))
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size, shuffle=True)
 
         val_data_list = []
         for index, row in val.iterrows():
             val_data_list.append(smiles2graph_descriptors(row, withdrawn_col, descriptors_from=descriptors_from))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
+        pos_weight = torch.Tensor([(len(train) / len(train.loc[train[withdrawn_col] == 1]))])
         conf.pos_weight = pos_weight
 
         model = TransformerNet(

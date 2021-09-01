@@ -571,7 +571,7 @@ def smiles2graph_descriptors(data, withdrawn_col, descriptors_from):
     graph['node_feat'] = torch.Tensor(x)
     graph['y'] = torch.Tensor([y])
     graph['feature_names'] = names
-    graph['descriptors'] = torch.Tensor(descriptors)
+    graph['descriptors'] = torch.Tensor([descriptors])
 
     return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], descriptors=graph['descriptors'],
                 feature_names=names)

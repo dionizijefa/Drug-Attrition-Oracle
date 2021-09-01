@@ -205,9 +205,8 @@ def process_drugbank(data, dataset, phase):
 
                 # try to add smiles if exists
                 try:
-                    if data.loc[data[key] == mol]['smiles'].values[0] == 'missing':
-                        smiles = res['molecule_structures']['canonical_smiles']
-                        data.at[index, 'canonical_smiles'] = smiles
+                    smiles = res['molecule_structures']['canonical_smiles']
+                    data.at[index, 'canonical_smiles'] = smiles
                 except TypeError:
                     print('No smiles for molecule {}'.format(mol))
 
@@ -237,53 +236,63 @@ def process_drugbank(data, dataset, phase):
     data['molecular_mechanism'] = 'missing'
     data['target_chembl_id'] = 'missing'
 
-    for molecule in tqdm(list(data['molecule_chembl_id'])):
-        for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
-            if mechanism['max_phase'] == phase:
-                for i in mechanism_list:
-                    if data.loc[data['molecule_chembl_id'] == molecule][i].values[0] == 'missing':
-                        data.loc[data['molecule_chembl_id'] == molecule, i] = mechanism[i]
-                    else:
-                        old_label = data.loc[data['molecule_chembl_id'] == molecule][i].values[0]
-                        data.loc[data['molecule_chembl_id'] == molecule, i] = '{}+{}'.format(old_label,
-                                                                                                     mechanism[i])
+    data['max_phase'] = pd.to_numeric(data['max_phase'], errors='coerce')
+
+    if dataset == 'drugbank':
+        key = 'molecule_chembl_id'
+    else:
+        key = 'chembl_id'
+
+    for molecule in tqdm(list(data[key])):
+        try:
+            for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
+                if mechanism['max_phase'] == phase:
+                    for i in mechanism_list:
+                        if data.loc[data[key] == molecule][i].values[0] == 'missing':
+                            data.loc[data[key] == molecule, i] = mechanism[i]
+                        else:
+                            old_label = data.loc[data[key] == molecule][i].values[0]
+                            data.loc[data[key] == molecule, i] = '{}+{}'.format(old_label, mechanism[i])
+        except:
+            print('Mechanism search error for molecule {}'.format(molecule))
 
     data = data.loc[(data['max_phase'] >= phase)]
     data['chembl_tox'] = 'Safe'
+
     for effect in toxic_dict:
         for molecule in toxic_dict[effect]:
             try:
-                old_label = data.loc[data['molecule_chembl_id'] == molecule]['chembl_tox'].values[0]
+                old_label = data.loc[data[key] == molecule]['chembl_tox'].values[0]
+                if old_label == 'Safe':
+                    data.loc[data[key] == molecule, 'chembl_tox'] = effect
+                else:
+                    data.loc[data[key] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
             except IndexError:
-                print('Mol {} not in the set'.format(molecule))
-            if old_label == 'Safe':
-                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = effect
-            else:
-                data.loc[data['molecule_chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
+                print('Toxic Mol {} not in the set'.format(molecule))
 
     if dataset == 'drugbank':
         data['dataset'] = 'drugbank'
-        data['withdrawn'] = 0
-        data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn'] = 1
+        data['withdrawn_drugbank'] = 0
+        data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn_drugbank'] = 1
         data = data.loc[~data['smiles'].isna()] # drop data which doesn't contain smiles
         data.to_csv(data_path / 'data/drugbank_min_phase_{}.csv'.format(phase))
 
     if dataset == 'withdrawn':
         data['dataset'] = 'withdrawn'
-        data['withdrawn'] = 1
+        data['withdrawn_withdrawn'] = 1
         data.to_csv(data_path / 'data/withdrawn_min_phase_{}.csv'.format(phase))
 
 
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
+    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)[:20]
 
     """
     Preprocess chembl
         1) Drop polymer and inorganic molecules
     """
-    """
+
     data = data.loc[data['Drug Type'] != "10:Polymer"]
     data = data.loc[data['Drug Type'] != "9:Inorganic"]
     data = data.loc[data['Phase'] >= phase]
@@ -404,12 +413,12 @@ def preprocess(phase):
         for molecule in toxic_dict[effect]:
             try:
                 old_label = data.loc[data['chembl_id'] == molecule]['chembl_tox'].values[0]
+                if old_label == 'Safe':
+                    data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = effect
+                else:
+                    data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
             except IndexError:
-                print('Mol {} not in the set'.format(molecule))
-            if old_label == 'Safe':
-                data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = effect
-            else:
-                data.loc[data['chembl_id'] == molecule, 'chembl_tox'] = '{}+{}'.format(old_label, effect)
+                print('Toxic Mol {} not in the set'.format(molecule))
     print('Finished adding toxicity')
 
 
@@ -420,34 +429,39 @@ def preprocess(phase):
     data['molecular_mechanism'] = 'missing'
     data['target_chembl_id'] = 'missing'
 
-
     for molecule in tqdm(list(data['chembl_id'])):
-        for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
-            if mechanism['max_phase'] == phase:
-                for i in mechanism_list:
-                    if data.loc[data['chembl_id'] == molecule][i].values[0] == 'missing':
-                        data.loc[data['chembl_id'] == molecule, i] = mechanism[i]
-                    else:
-                        old_label = data.loc[data['chembl_id'] == molecule][i].values[0]
-                        data.loc[data['chembl_id'] == molecule, i] = '{}+{}'.format(old_label, mechanism[i])
+        try:
+            for mechanism in new_client.mechanism.filter(molecule_chembl_id=molecule):
+                if mechanism['max_phase'] == phase:
+                    for i in mechanism_list:
+                        if data.loc[data['chembl_id'] == molecule][i].values[0] == 'missing':
+                            data.loc[data['chembl_id'] == molecule, i] = mechanism[i]
+                        else:
+                            old_label = data.loc[data['chembl_id'] == molecule][i].values[0]
+                            data.loc[data['chembl_id'] == molecule, i] = '{}+{}'.format(old_label, mechanism[i])
+        except:
+            print('Mechanism search error for molecule {}'.format(molecule))
+
 
     print('Finished adding mechanisms')
 
-
     print('Adding pubchem cids by inchikey')
     data['pubchem_cid'] = 'missing'
+
+    """
     for i in tqdm(list(data['inchi_key'])):
         try:
             cid = pcp.get_cids("ZQHFZHPUZXNPMF-UHFFFAOYSA-N", "inchikey")[0]
             data.loc[data['inchi_key'] == i, 'pubchem_cid'] = cid
         except:
             print("Molecule not found")
+    """
 
-    data['withdrawn'] = 0
-    data.loc[data['availability_type'] == 'Withdrawn', 'withdrawn'] = 1
+    data['withdrawn_chembl'] = 0
+    data.loc[data['availability_type'] == 'Withdrawn', 'withdrawn_chembl'] = 1
     data['dataset'] = 'chembl'
     data.to_csv('drugbank_min_phase_{}.csv'.format(phase))
-    """
+
     """ Load drugbank data - all drugbank molecules not found in chembl are discarded"""
     drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')
     drugbank = drugbank[['DrugBank ID', 'InChIKey', 'Drug Groups', 'SMILES', 'Name']]
@@ -460,11 +474,10 @@ def preprocess(phase):
     """ Load withdrawn data - all withdrawn molecule not found in chembl are discarded """
     withdrawn = pd.read_csv(data_path / 'data/raw/withdrawn.csv')
 
-    process_drugbank(drugbank, 'drugbank', phase)
-    process_drugbank(withdrawn, 'withdrawn', phase)
+    process_drugbank(drugbank[:20], 'drugbank', phase)
+    process_drugbank(withdrawn[:20], 'withdrawn', phase)
 
 
 if __name__ == "__main__":
     preprocess()
-
 

@@ -1,4 +1,4 @@
-Name,Pubchem_cid,CHEMBLID,Countries,Toxicity type
+name,pubchem_cid,chembl_id,countries,toxicity_type
 Telaprevir,CID3010818,CHEMBL231813,USA,toxic_dermis
 Ribavirin,CID37542,CHEMBL1643,USA;EU,toxic_respiratory
 Ketoconazole,CID47576,CHEMBL295698,EU;AUS,toxic_hepa

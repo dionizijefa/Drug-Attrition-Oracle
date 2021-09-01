@@ -32,7 +32,7 @@ class EGConvNet(Module):
 
         self.linear_2 = Linear((descriptors_len + hidden_channels // 4), 128)
         self.batch_norm_1 = BatchNorm1d(128)
-        self.out = Linear((128, 1))
+        self.out = Linear(128, 1)
 
     def forward(self, x, edge_index, batch, descriptors):
         #x = torch.tensor(x).to(torch.int64) za GNN explainer
