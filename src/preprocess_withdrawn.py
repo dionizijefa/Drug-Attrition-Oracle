@@ -504,9 +504,6 @@ def preprocess(phase):
         all_data.loc[all_data['chembl_id'] == chembl_id, 'withdrawn_tox'] = withdrawn_tox
 
     # drop duplicates from all_data
-    all_data.dropna(subset=['smiles'], inplace=True)
-    all_data.drop_duplicates(subset=['smiles'], inplace=True)
-
     all_data['wd_consensus_1'] = 0
     all_data['wd_consensus_2'] = 0
     all_data['wd_consensus_3'] = 0
@@ -517,6 +514,8 @@ def preprocess(phase):
         withdrawn_label = row['withdrawn_withdrawn']
         drugbank_label = row['withdrawn_drugbank']
         chembl_label = row['withdrawn_chembl']
+        if np.isnan(withdrawn_label):
+            withdrawn_label = 0
         if np.isnan(drugbank_label):
             drugbank_label = 0
         if np.isnan(chembl_label):
@@ -529,6 +528,8 @@ def preprocess(phase):
         if consensus == 3:
             all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_3'] = 1
 
+    all_data.dropna(subset=['smiles'], inplace=True)
+    all_data.drop_duplicates(subset=['smiles'], inplace=True)
 
     all_data.to_csv(data_path / 'data/processing_pipeline/alldata_min_phase_{}.csv'.format(phase))
 

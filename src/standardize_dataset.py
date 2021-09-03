@@ -1,9 +1,18 @@
+from pathlib import Path
+
 import pandas as pd
 from rdkit.Chem import MolToSmiles, MolFromSmiles
 from rdkit.Chem.Scaffolds.MurckoScaffold import MakeScaffoldGeneric
 from standardiser import standardise
+import click
 
-def standardise_dataset(data: pd.DataFrame):
+data_path = Path(__file__).resolve().parents[1].absolute()
+
+
+@click.command()
+@click.option('-dataset_path', help='Path of the dataset')
+def standardize_dataset(dataset_path):
+    data = pd.read_csv(dataset_path, index_col=0)
     standardized_smiles = []
     scaffolds_generic = []
 
@@ -23,3 +32,10 @@ def standardise_dataset(data: pd.DataFrame):
     data['smiles'] = standardized_smiles
     data['scaffolds'] = scaffolds_generic
 
+    data = data.loc[data['smiles'] != 0]  # drop molecules that have not passed standardizer
+    output_name = str(dataset_path).split('.')[0]
+    data.to_csv(data_path / '{}_standardized.csv'.format(output_name))
+
+
+if __name__ == "__main__":
+    standardize_dataset()
