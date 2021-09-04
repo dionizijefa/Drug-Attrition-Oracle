@@ -530,6 +530,7 @@ def preprocess(phase):
 
     all_data.dropna(subset=['smiles'], inplace=True)
     all_data.drop_duplicates(subset=['smiles'], inplace=True)
+    all_data.drop_duplicates(subset=['smiles'], inplace=True)
 
     all_data.to_csv(data_path / 'data/processing_pipeline/alldata_min_phase_{}.csv'.format(phase))
 

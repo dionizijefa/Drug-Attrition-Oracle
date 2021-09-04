@@ -11,8 +11,11 @@ data_path = Path(__file__).resolve().parents[1].absolute()
 
 @click.command()
 @click.option('-dataset_path', help='Path of the dataset')
-def standardize_dataset(dataset_path):
+@click.option('-drop_duplicates', help='Drop duplicates from an ID column', default=None)
+def standardize_dataset(dataset_path, drop_duplicates):
     data = pd.read_csv(dataset_path, index_col=0)
+    data = data.drop_duplicates(subset=drop_duplicates)
+    data = data.drop_duplicates(subset='smiles')
     standardized_smiles = []
     scaffolds_generic = []
 
