@@ -291,7 +291,7 @@ def process_drugbank(data, dataset, phase):
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
+    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)[:20]
     """
     Preprocess chembl
         1) Drop polymer and inorganic molecules
@@ -469,7 +469,7 @@ def preprocess(phase):
     data.to_csv(data_path / 'data/processing_pipeline/chembl_min_phase_{}.csv'.format(phase))
 
     """ Load and proccess drugbank and withdrawn data"""
-    drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')
+    drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')[:20]
     drugbank = drugbank[['DrugBank ID', 'InChIKey', 'Drug Groups', 'SMILES', 'Name']]
     drugbank.rename(columns={'DrugBank ID': 'drugbank_id',
                              'InChIKey': 'inchi_key',
@@ -477,7 +477,7 @@ def preprocess(phase):
                              'SMILES': 'smiles',
                              'Name': 'synonyms'}, inplace=True)
 
-    withdrawn_input = pd.read_csv(data_path / 'data/raw/withdrawn.csv')
+    withdrawn_input = pd.read_csv(data_path / 'data/raw/withdrawn.csv')[:20]
 
     drugbank = process_drugbank(drugbank, 'drugbank', phase)
     withdrawn = process_drugbank(withdrawn_input, 'withdrawn', phase)
@@ -513,29 +513,33 @@ def preprocess(phase):
     all_data['wd_consensus_2'] = 0
     all_data['wd_consensus_3'] = 0
 
-    drugbank_withdrawn = all_data.loc[all_data['withdrawn_drugbank'] == 1]['chembl_id']
-    chembl_withdrawn = all_data.loc[all_data['withdrawn_chembl'] == 1]['chembl_id']
-    withdrawn_withdrawn = withdrawn_input['chembl_id']
+    drugbank_withdrawn = list(all_data.loc[all_data['withdrawn_drugbank'] == 1]['chembl_id'])
+    chembl_withdrawn = list(all_data.loc[all_data['withdrawn_chembl'] == 1]['chembl_id'])
+    withdrawn_withdrawn = list(withdrawn_input['chembl_id'])
 
-    all_data.loc[all_data['chembl_id'].isin((drugbank_withdrawn) |
-                                            (chembl_withdrawn) |
-                                            (withdrawn_withdrawn)), 'wd_consensus_1'] = 1
+    for index, row in all_data.iterrows():
+        id = row['chembl_id']
+        is_wd_db = 0
+        is_wd_cb = 0
+        is_wd_wd = 0
+        if id in drugbank_withdrawn:
+            is_wd_db = 1
+        if id in chembl_withdrawn:
+            is_wd_cb = 1
+        if id in withdrawn_withdrawn:
+            is_wd_wd = 1
 
-    all_data.loc[all_data['chembl_id'].isin((drugbank_withdrawn) &
-                                            (chembl_withdrawn |
-                                            withdrawn_withdrawn)), 'wd_consensus_2'] = 1
-    all_data.loc[all_data['chembl_id'].isin((chembl_withdrawn) &
-                                            (drugbank_withdrawn |
-                                            withdrawn_withdrawn)), 'wd_consensus_2'] = 1
-    all_data.loc[all_data['chembl_id'].isin((withdrawn_withdrawn) &
-                                            (drugbank_withdrawn |
-                                            chembl_withdrawn)), 'wd_consensus_2'] = 1
+        sum = is_wd_db + is_wd_cb + is_wd_wd
 
-    all_data.loc[all_data['chembl_id'].isin((withdrawn_withdrawn) &
-                                            (drugbank_withdrawn &
-                                            chembl_withdrawn)), 'wd_consensus_3'] = 1
+        if sum == 1:
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_1'] = 1
+        if sum == 2:
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_2'] = 1
+        if sum == 3:
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_3'] = 1
 
     all_data.dropna(subset=['smiles'], inplace=True)
+    all_data = all_data.loc[all_data['chembl_id'] != 'missing']
 
     all_data.to_csv(data_path / 'data/processing_pipeline/alldata_min_phase_{}.csv'.format(phase))
 
