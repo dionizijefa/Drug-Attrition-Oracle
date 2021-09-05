@@ -291,7 +291,7 @@ def process_drugbank(data, dataset, phase):
 @click.command()
 @click.option('-phase', default=4, help='Minimum phase of the drug to use')
 def preprocess(phase):
-    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)[:20]
+    data = pd.read_csv(data_path / 'data/raw/chembl.csv', sep=';', error_bad_lines=True)
     """
     Preprocess chembl
         1) Drop polymer and inorganic molecules
@@ -469,7 +469,7 @@ def preprocess(phase):
     data.to_csv(data_path / 'data/processing_pipeline/chembl_min_phase_{}.csv'.format(phase))
 
     """ Load and proccess drugbank and withdrawn data"""
-    drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')[:20]
+    drugbank = pd.read_csv(data_path / 'data/raw/structure links.csv')
     drugbank = drugbank[['DrugBank ID', 'InChIKey', 'Drug Groups', 'SMILES', 'Name']]
     drugbank.rename(columns={'DrugBank ID': 'drugbank_id',
                              'InChIKey': 'inchi_key',
@@ -477,7 +477,7 @@ def preprocess(phase):
                              'SMILES': 'smiles',
                              'Name': 'synonyms'}, inplace=True)
 
-    withdrawn_input = pd.read_csv(data_path / 'data/raw/withdrawn.csv')[:20]
+    withdrawn_input = pd.read_csv(data_path / 'data/raw/withdrawn.csv')
 
     drugbank = process_drugbank(drugbank, 'drugbank', phase)
     withdrawn = process_drugbank(withdrawn_input, 'withdrawn', phase)
