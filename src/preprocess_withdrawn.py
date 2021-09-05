@@ -513,28 +513,29 @@ def preprocess(phase):
     all_data['wd_consensus_2'] = 0
     all_data['wd_consensus_3'] = 0
 
-    for index, row in all_data.iterrows():
-        chembl_id = row['chembl_id']
-        withdrawn_label = row['withdrawn_withdrawn']
-        drugbank_label = row['withdrawn_drugbank']
-        chembl_label = row['withdrawn_chembl']
-        if np.isnan(withdrawn_label):
-            withdrawn_label = 0
-        if np.isnan(drugbank_label):
-            drugbank_label = 0
-        if np.isnan(chembl_label):
-            chembl_label = 0
-        consensus = withdrawn_label + drugbank_label + chembl_label
-        if consensus == 1:
-            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_1'] = 1
-        if consensus == 2:
-            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_2'] = 1
-        if consensus == 3:
-            all_data.loc[all_data['chembl_id'] == chembl_id, 'wd_consensus_3'] = 1
+    drugbank_withdrawn = all_data.loc[all_data['withdrawn_drugbank'] == 1]['chembl_id']
+    chembl_withdrawn = all_data.loc[all_data['withdrawn_chembl'] == 1]['chembl_id']
+    withdrawn_withdrawn = withdrawn_input['chembl_id']
+
+    all_data.loc[all_data['chembl_id'].isin((drugbank_withdrawn) |
+                                            (chembl_withdrawn) |
+                                            (withdrawn_withdrawn)), 'wd_consensus_1'] = 1
+
+    all_data.loc[all_data['chembl_id'].isin((drugbank_withdrawn) &
+                                            (chembl_withdrawn |
+                                            withdrawn_withdrawn)), 'wd_consensus_2'] = 1
+    all_data.loc[all_data['chembl_id'].isin((chembl_withdrawn) &
+                                            (drugbank_withdrawn |
+                                            withdrawn_withdrawn)), 'wd_consensus_2'] = 1
+    all_data.loc[all_data['chembl_id'].isin((withdrawn_withdrawn) &
+                                            (drugbank_withdrawn |
+                                            chembl_withdrawn)), 'wd_consensus_2'] = 1
+
+    all_data.loc[all_data['chembl_id'].isin((withdrawn_withdrawn) &
+                                            (drugbank_withdrawn &
+                                            chembl_withdrawn)), 'wd_consensus_3'] = 1
 
     all_data.dropna(subset=['smiles'], inplace=True)
-    all_data.drop_duplicates(subset=['smiles'], inplace=True)
-    all_data.drop_duplicates(subset=['smiles'], inplace=True)
 
     all_data.to_csv(data_path / 'data/processing_pipeline/alldata_min_phase_{}.csv'.format(phase))
 

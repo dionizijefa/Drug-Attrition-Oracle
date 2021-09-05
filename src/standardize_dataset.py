@@ -21,19 +21,22 @@ def standardize_dataset(dataset_path, drop_duplicates):
         try:
             new_mol = standardise.run(smiles)
             standardized_smiles.append(new_mol)
+        except Exception as e:
+            print(e)
+            standardized_smiles.append(0)
+        try:
             # generate generic scaffolds -> all atom types are C and all bonds are single -> more strict split
             scaffolds_generic.append(MolToSmiles(MakeScaffoldGeneric(MolFromSmiles(new_mol))))
         except Exception as e:
             print(e)
             scaffolds_generic.append(0)
-            standardized_smiles.append(0)
 
     # drop molecule which can't be standardized
-    data = data.drop(columns=['smiles'])
     data['standardized_smiles'] = standardized_smiles
     data['scaffolds'] = scaffolds_generic
     data = data.drop_duplicates(subset=drop_duplicates)
     data = data.drop_duplicates(subset='standardized_smiles')
+    data = data.drop_duplicates(subset='parent_inchi_key') # missing values should stay
 
     data = data.loc[data['standardized_smiles'] != 0]  # drop molecules that have not passed standardizer
     output_name = str(dataset_path).split('.')[0]
