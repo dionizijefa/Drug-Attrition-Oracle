@@ -14,8 +14,6 @@ data_path = Path(__file__).resolve().parents[1].absolute()
 @click.option('-drop_duplicates', help='Drop duplicates from an ID column', default=None)
 def standardize_dataset(dataset_path, drop_duplicates):
     data = pd.read_csv(dataset_path, index_col=0)
-    data = data.drop_duplicates(subset=drop_duplicates)
-    data = data.drop_duplicates(subset='smiles')
     standardized_smiles = []
     scaffolds_generic = []
 
@@ -32,10 +30,12 @@ def standardize_dataset(dataset_path, drop_duplicates):
 
     # drop molecule which can't be standardized
     data = data.drop(columns=['smiles'])
-    data['smiles'] = standardized_smiles
+    data['standardized_smiles'] = standardized_smiles
     data['scaffolds'] = scaffolds_generic
+    data = data.drop_duplicates(subset=drop_duplicates)
+    data = data.drop_duplicates(subset='standardized_smiles')
 
-    data = data.loc[data['smiles'] != 0]  # drop molecules that have not passed standardizer
+    data = data.loc[data['standardized_smiles'] != 0]  # drop molecules that have not passed standardizer
     output_name = str(dataset_path).split('.')[0]
     data.to_csv(data_path / '{}_standardized.csv'.format(output_name))
 
