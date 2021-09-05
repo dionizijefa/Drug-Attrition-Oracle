@@ -158,19 +158,20 @@ toxic_dict = {"toxic_carcinogenic": toxic_carcinogenic, "toxic_cardio": toxic_ca
 mechanism_list = ['action_type', 'direct_interaction', 'disease_efficacy', 'molecular_mechanism',
                   'target_chembl_id']
 
+
 def process_drugbank(data, dataset, phase):
     molecule = new_client.molecule
     data_list_of_features = ['molecule_type', 'structure_type', 'therapeutic_flag', 'molecule_chembl_id',
-                                 'max_phase', 'atc_classifications',
-                                 'chirality', 'prodrug', 'oral', 'parenteral', 'topical', 'black_box_warning',
-                                 'availability_type', 'withdrawn_year',
-                                 'withdrawn_reason', 'withdrawn_country', 'withdrawn_class', 'molecule_type',
-                                 'structure_type', 'therapeutic_flag']
+                             'max_phase', 'atc_classifications',
+                             'chirality', 'prodrug', 'oral', 'parenteral', 'topical', 'black_box_warning',
+                             'availability_type', 'withdrawn_year',
+                             'withdrawn_reason', 'withdrawn_country', 'withdrawn_class', 'molecule_type',
+                             'structure_type', 'therapeutic_flag']
     data_list_of_properties = ['alogp', 'aromatic_rings', 'cx_logd', 'cx_logp', 'cx_most_apka', 'cx_most_bpka',
-                                   'full_mwt', 'hba', 'hba_lipinski',
-                                   'hbd', 'hbd_lipinski', 'heavy_atoms', 'molecular_species', 'mw_freebase',
-                                   'mw_monoisotopic', 'num_lipinski_ro5_violations',
-                                   'num_ro5_violations', 'psa', 'qed_weighted', 'ro3_pass', 'rtb']
+                               'full_mwt', 'hba', 'hba_lipinski',
+                               'hbd', 'hbd_lipinski', 'heavy_atoms', 'molecular_species', 'mw_freebase',
+                               'mw_monoisotopic', 'num_lipinski_ro5_violations',
+                               'num_ro5_violations', 'psa', 'qed_weighted', 'ro3_pass', 'rtb']
     for i in data_list_of_features:
         data[i] = 'missing'
     for i in data_list_of_properties:
@@ -257,7 +258,8 @@ def process_drugbank(data, dataset, phase):
         except:
             print('Mechanism search error for molecule {}'.format(molecule))
 
-    data = data.loc[(data['max_phase'] >= phase)]
+    if phase != 0:
+        data = data.loc[(data['max_phase'] >= phase)]
     data['chembl_tox'] = 'Safe'
 
     for effect in toxic_dict:
@@ -275,7 +277,7 @@ def process_drugbank(data, dataset, phase):
         data.rename(columns={'molecule_chembl_id': 'chembl_id'}, inplace=True)
         data['withdrawn_drugbank'] = 0
         data.loc[data['drug_groups'].str.contains('withdrawn'), 'withdrawn_drugbank'] = 1
-        data = data.loc[~data['smiles'].isna()] # drop data which doesn't contain smiles
+        data = data.loc[~data['smiles'].isna()]  # drop data which doesn't contain smiles
         data.to_csv(data_path / 'data/processing_pipeline/drugbank_min_phase_{}.csv'.format(phase))
 
     if dataset == 'withdrawn':
@@ -297,7 +299,12 @@ def preprocess(phase):
 
     data = data.loc[data['Drug Type'] != "10:Polymer"]
     data = data.loc[data['Drug Type'] != "9:Inorganic"]
-    data = data.loc[data['Phase'] >= phase]
+
+    if phase == 0:
+        data = data.loc[data['Phase'] >= 3]  # still use only phase 3 fpr chembl drugs because
+        # there are 10k compounds in chembl
+    else:
+        data = data.loc[data['Phase'] >= phase]
 
     data = data[['Parent Molecule', 'Synonyms', 'Phase', 'ATC Codes', 'Level 4 ATC Codes', 'Level 3 ATC Codes',
                  'Level 2 ATC Codes', 'Level 1 ATC Codes',
@@ -423,7 +430,6 @@ def preprocess(phase):
                 continue
     print('Finished adding toxicity')
 
-
     print('Adding mechanisms')
     data['action_type'] = 'missing'
     data['direct_interaction'] = 'missing'
@@ -443,7 +449,6 @@ def preprocess(phase):
                             data.loc[data['chembl_id'] == molecule, i] = '{}+{}'.format(old_label, mechanism[i])
         except:
             print('Mechanism search error for molecule {}'.format(molecule))
-
 
     print('Finished adding mechanisms')
 
@@ -490,8 +495,8 @@ def preprocess(phase):
     all_data['withdrawn_withdrawn'] = 0  # because wd contains only withdrawn, there would be too many NANs
 
     databases = {'withdrawn_chembl': data,
-                'withdrawn_drugbank': drugbank,
-                'withdrawn_withdrawn': withdrawn}
+                 'withdrawn_drugbank': drugbank,
+                 'withdrawn_withdrawn': withdrawn}
 
     for i in databases.keys():
         for chembl_id in databases[i]['chembl_id']:
@@ -507,7 +512,6 @@ def preprocess(phase):
     all_data['wd_consensus_1'] = 0
     all_data['wd_consensus_2'] = 0
     all_data['wd_consensus_3'] = 0
-
 
     for index, row in all_data.iterrows():
         chembl_id = row['chembl_id']
@@ -537,4 +541,3 @@ def preprocess(phase):
 
 if __name__ == "__main__":
     preprocess()
-
