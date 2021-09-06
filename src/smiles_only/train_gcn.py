@@ -1,206 +1,97 @@
-import dataclasses
 import shutil
-from abc import ABC
 from pathlib import Path
-from pprint import pformat
 from time import time
-from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+import umap
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
-from torchmetrics.functional import average_precision, auroc
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim import Adam
+from rdkit import Chem, DataStructs
+from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearchCV
+from sklearn.neighbors import KernelDensity
+from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader
 import torch
 from data_utils import smiles2graph
-from EGConv import EGConvNet
 import click
+from EGConv_lightning import Conf, EGConvNet
 
 root = Path(__file__).resolve().parents[2].absolute()
 
-
-@dataclasses.dataclass(
-    # frozen=True
-)
-class Conf:
-    gpus: int = 1
-    seed: int = 42
-    use_16bit: bool = False
-    save_dir = '{}/models/'.format(root)
-    lr: float = 1e-4
-    batch_size: int = 16
-    epochs: int = 300
-    ckpt_path: Optional[str] = None
-    reduce_lr: Optional[bool] = False
-    pos_weight: torch.Tensor = torch.Tensor([8])
-    hidden_channels: int = 1024
-    num_layers: int = 4
-    num_heads: int = 8
-    num_bases: int = 4
-
-    def to_hparams(self) -> Dict:
-        excludes = [
-            'ckpt_path',
-            'reduce_lr',
-        ]
-        return {
-            k: v
-            for k, v in dataclasses.asdict(self).items()
-            if k not in excludes
-        }
-
-    def __str__(self):
-        return pformat(dataclasses.asdict(self))
-
-class TransformerNet(pl.LightningModule, ABC):
-    def __init__(
-            self,
-            hparams,
-            reduce_lr: Optional[bool] = True,
-    ):
-        super().__init__()
-        self.save_hyperparameters(hparams)
-        self.reduce_lr = reduce_lr
-        self.model = EGConvNet(
-            self.hparams.hidden_channels,
-            self.hparams.num_layers,
-            self.hparams.num_heads,
-            self.hparams.num_bases,
-            aggregator=['sum', 'mean', 'max']
-        )
-        pl.seed_everything(hparams['seed'])
-
-    def forward(self, data):
-        out = self.model(data.x, data.edge_index, data.batch, None)
-        return out
-
-    def training_step(self, batch, batch_idx):
-        metrics = self.shared_step(batch, batch_idx)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'])
-        self.log("loss", metrics.get("loss"))
-        return metrics.get("loss")
-
-    def validation_step(self, batch, batch_idx):
-        metrics = self.shared_step(batch, batch_idx)
-        self.log('val_loss',
-                 metrics.get("loss"),
-                 prog_bar=False, on_step=False)
-        self.log('val_loss_epoch',
-                 metrics.get("loss"),
-                 on_step=False, on_epoch=True, prog_bar=False)
-        return {
-            "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets"),
-        }
-
-    def validation_epoch_end(self, outputs):
-        predictions = torch.cat([x.get('predictions') for x in outputs], 0)
-        targets = torch.cat([x.get('targets') for x in outputs], 0)
-
-        ap = average_precision(predictions, targets)
-        auc = auroc(predictions, targets)
-
-        log_metrics = {
-            'val_ap_epoch': ap,
-            'val_auc_epoch': auc
-        }
-        self.log_dict(log_metrics)
-        self.log('val_ap',
-                 ap,
-                 on_step=False, on_epoch=True, prog_bar=True)
-
-    def test_step(self, batch, batch_idx):
-        metrics = self.shared_step(batch, batch_idx)
-        return {
-            "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets")
-        }
-
-    def test_epoch_end(self, outputs):
-        predictions = torch.cat([x.get('predictions') for x in outputs], 0)
-        target = torch.cat([x.get('targets') for x in outputs], 0)
-
-        ap = average_precision(predictions, target)
-        auc = auroc(predictions, target)
-
-        log_metrics = {
-            'test_ap': ap,
-            'test_auc': auc,
-        }
-        self.log_dict(log_metrics)
-
-    def shared_step(self, data, batchidx):
-        y_hat = self.model(data.x, data.edge_index, data.batch)
-        pos_weight = self.hparams.pos_weight.to("cuda")
-        loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        loss = loss_fn(y_hat, data.y.unsqueeze(-1))
-
-        return {
-            'loss': loss,
-            'predictions': y_hat,
-            'targets': data.y.unsqueeze(-1).long(),
-        }
-
-    def configure_optimizers(self):
-        opt = Adam(
-            self.model.parameters(),
-            lr=self.hparams.lr,
-            amsgrad=True,
-        )
-
-        sched = {
-            'scheduler': ReduceLROnPlateau(
-                opt,
-                mode='min',
-                patience=10,
-                factor=0.5,
-            ),
-            'monitor': 'val_loss'
-        }
-
-        if self.reduce_lr is False:
-            return [opt]
-
-        return [opt], [sched]
-
-    def get_progress_bar_dict(self):
-        items = super().get_progress_bar_dict()
-        # version = self.trainer.logger.version[-10:]
-        # items["v_num"] = version
-        return items
-
-
 @click.command()
-@click.option('-train_data', default='chembl_4_smiles.csv')
+@click.option('-train_path', default='/processing_pipeline/train/train.csv')
 @click.option('-dataset', default='all')
-@click.option('-withdrawn_col', default='withdrawn')
+@click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu):
+@click.option('-stratify_chemical_space', default=True)
+@click.option('-save_model', default=False)
+@click.option('-seed', default=0)
+def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_space, seed, save_model):
     if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['smiles', withdrawn_col]]
-        data = data.sample(frac=1, random_state=0)
+        data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+        data = data.sample(frac=1, random_state=seed) # shuffle
 
-    else:
-        data = pd.read_csv(root / 'data/{}'.format(train_data))
-        data = data.loc[(data['dataset'] == dataset) |
-                        (data['dataset'] == 'both') |
-                        (data['dataset'] == 'withdrawn')][['smiles', withdrawn_col]]
-        data = data.sample(frac=1, random_state=0)
+    # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
+    # append non-unique scaffolds to train at the end
+
+    if stratify_chemical_space == True:
+        """ generates KDE on UMAP embeddings to stratify train-test splits """
+        print('\n')
+        print('Performing UMAP and KDE grid search CV to stratify the chemical space across folds')
+        #generate morgan fps first
+        data_fps = []
+        for i in data['standardized_smiles']:
+            mol = Chem.MolFromSmiles(i)
+            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+            array = np.zeros((0,), dtype=np.int8)
+            DataStructs.ConvertToNumpyArray(fp, array)
+            data_fps.append(array)
+
+        umapper = umap.UMAP(
+            n_components=2,
+            metric='jaccard',
+            learning_rate=0.5,
+            low_memory=True,
+            transform_seed=42,
+            random_state=42,
+        )
+        umap_embeddings = umapper.fit_transform(data_fps)
+        params = {'bandwidth': np.logspace(-1, 1, 20)}
+        grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
+        grid.fit(
+            umap_embeddings
+        )
+        data['kde_prob'] = np.exp(grid.best_estimator_.score_samples(umap_embeddings))
+        first_quartile = data['kde_prob'].describe()['25%']
+        second_quartile = data['kde_prob'].describe()['50%']
+        third_quartile = data['kde_prob'].describe()['75%']
+        data['kde_quartile'] = 'first'
+        data.loc[data['kde_prob'] < first_quartile, 'kde_quartile'] = 'first'
+        data.loc[(data['kde_prob'] > first_quartile) &
+                 (data['kde_prob'] <= second_quartile), 'kde_quartile'] = 'second'
+        data.loc[(data['kde_prob'] > second_quartile) &
+                 (data['kde_prob'] <= third_quartile), 'kde_quartile'] = 'third'
+        data.loc[data['kde_prob'] > third_quartile, 'kde_quartile'] = 'fourth'
+
+    data['stratify_label'] = data['wd_consensus_1'].astype(str) + data['kde_quartile']
+    scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
+    unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
+    data_unique_scaffolds = data.loc[data['scaffolds'].isin(unique_scaffolds)]
 
 
-    train_test_splitter = StratifiedKFold(n_splits=5, random_state=0)
+    cv_splitter = StratifiedKFold(
+        n_splits=5,
+        random_state=seed,
+    )
 
     fold_ap = []
     fold_auc_roc = []
     cv_fold = []
 
     for k, (train_index, test_index) in enumerate(
-            train_test_splitter.split(data, data[withdrawn_col])
+            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds['stratify_label'])
     ):
 
         conf = Conf(
@@ -210,9 +101,10 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             reduce_lr=True,
         )
 
+
         logger = TensorBoardLogger(
             conf.save_dir,
-            name='transformer_net',
+            name='EGConv',
             version='{}'.format(str(int(time()))),
         )
 
@@ -227,33 +119,54 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
                                             patience=15,
                                             verbose=False)
 
-        test = data.iloc[test_index]
+        test = data_unique_scaffolds.iloc[test_index]
         test_data_list = []
         for index, row in test.iterrows():
             test_data_list.append(smiles2graph(row, withdrawn_col))
         test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        train_set = data.iloc[train_index]
+        train_set = data_unique_scaffolds.iloc[train_index]
 
-        train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True,
-                                      random_state=0)
+        train, val = train_test_split(
+            train_set,
+            test_size=0.2,
+            stratify=train_set['stratify_label'],
+            shuffle=True,
+            random_state=seed)
+        # append common scaffolds to train
+        train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
 
         train_data_list = []
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, withdrawn_col))
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
+
+        # balanced sampling of the minority class
+        withdrawn = train[withdrawn_col].value_counts()[1]
+        approved = train[withdrawn_col].value_counts()[0]
+        class_sample_count = [approved, withdrawn]
+        weights = 1 / torch.Tensor(class_sample_count)
+        samples_weights = weights[train[withdrawn_col].values]
+        sampler = WeightedRandomSampler(samples_weights,
+                                        num_samples=len(samples_weights),
+                                        replacement=True)
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size,
+                                  sampler=sampler)
 
         val_data_list = []
         for index, row in val.iterrows():
             val_data_list.append(smiles2graph(row, withdrawn_col))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
 
-        pos_weight = torch.Tensor([(len(train) / len(train.loc[train[withdrawn_col] == 1]))])
-        conf.pos_weight = pos_weight
-
-        model = TransformerNet(
+        model = EGConvNet(
             conf.to_hparams(),
             reduce_lr=conf.reduce_lr,
+        )
+
+        checkpoint = ModelCheckpoint(
+                dirpath=(logger.log_dir + '/checkpoint/'),
+                monitor='val_ap_epoch',
+                mode='max',
+                save_top_k=1,
         )
 
         print("Starting training")
@@ -262,13 +175,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
             gpus=[gpu],  # [0]
             logger=logger,  # load from checkpoint instead of resume
             weights_summary='top',
-            callbacks=[early_stop_callback],
-            checkpoint_callback=ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-            ),
+            callbacks=[early_stop_callback, checkpoint if save_model else None],
             deterministic=True,
             auto_lr_find=False,
             num_sanity_val_steps=0

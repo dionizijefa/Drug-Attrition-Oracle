@@ -16,6 +16,8 @@ def train_test_split(dataset_path):
     train, test = splitter(data_unique_scaffolds, test_size=0.20,
                                    stratify=data_unique_scaffolds['wd_consensus_1'])
     test.to_csv(data_path / 'data/processing_pipeline/test/alldata_min_phase_4_test.csv')
+    train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]]) # append data not in unique scaffolds
+    train.to_csv(data_path / 'data/processing_pipeline/train/alldata_min_phase_4_train.csv')
 
 if __name__ == "__main__":
     train_test_split()
