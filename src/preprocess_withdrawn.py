@@ -494,6 +494,7 @@ def preprocess(phase):
     all_data['withdrawn_drugbank'] = np.nan
     all_data['withdrawn_withdrawn'] = 0  # because wd contains only withdrawn, there would be too many NANs
 
+    # load original data and add labels, so it's implicitly known where from the data is
     databases = {'withdrawn_chembl': data,
                  'withdrawn_drugbank': drugbank,
                  'withdrawn_withdrawn': withdrawn}
@@ -508,7 +509,6 @@ def preprocess(phase):
         withdrawn_tox = withdrawn_input.loc[withdrawn_input['chembl_id'] == chembl_id]['toxicity_type']
         all_data.loc[all_data['chembl_id'] == chembl_id, 'withdrawn_tox'] = withdrawn_tox
 
-    # drop duplicates from all_data
     all_data['wd_consensus_1'] = 0
     all_data['wd_consensus_2'] = 0
     all_data['wd_consensus_3'] = 0
@@ -534,8 +534,11 @@ def preprocess(phase):
         if sum == 1:
             all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_1'] = 1
         if sum == 2:
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_1'] = 1
             all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_2'] = 1
         if sum == 3:
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_1'] = 1
+            all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_2'] = 1
             all_data.loc[all_data['chembl_id'] == id, 'wd_consensus_3'] = 1
 
     all_data.dropna(subset=['smiles'], inplace=True)
