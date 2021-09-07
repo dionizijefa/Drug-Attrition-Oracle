@@ -61,12 +61,20 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
             random_state=42,
         )
         umap_embeddings = umapper.fit_transform(data_fps)
+        data['umap_embeddings'] = umap_embeddings
         params = {'bandwidth': np.logspace(-1, 1, 20)}
-        grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
-        grid.fit(
-            umap_embeddings
+        withdrawn_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
+        approved_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
+        withdrawn_grid.fit(
+            list(data.loc[data[withdrawn_col] == 1]['umap_embeddings'])
         )
-        data['kde_prob'] = np.exp(grid.best_estimator_.score_samples(umap_embeddings))
+        approved_grid.fit(
+            list(data.loc[data[withdrawn_col] == 0]['umap_embeddings'])
+        )
+        data['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(umap_embeddings))
+        data['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
+
+        """
         first_quartile = data['kde_prob'].describe()['25%']
         second_quartile = data['kde_prob'].describe()['50%']
         third_quartile = data['kde_prob'].describe()['75%']
@@ -77,14 +85,13 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
         data.loc[(data['kde_prob'] > second_quartile) &
                  (data['kde_prob'] <= third_quartile), 'kde_quartile'] = 'third'
         data.loc[data['kde_prob'] > third_quartile, 'kde_quartile'] = 'fourth'
-
         data['stratify_label'] = data['wd_consensus_1'].astype(str) + data['kde_quartile']
         stratify_key = 'stratify_label'
+        """
 
     scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
     unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
     data_unique_scaffolds = data.loc[data['scaffolds'].isin(unique_scaffolds)]
-
 
     cv_splitter = StratifiedKFold(
         n_splits=5,
@@ -218,8 +225,10 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
             predictions.append(model.forward(i).detach().cpu().numpy())
         predictions = [prediction for sublist in predictions for prediction in sublist]
         test['model_outputs'] = predictions
-        predictions_densities.append(test[['model_outputs', 'kde_prob', withdrawn_col]])
-
+        predictions_densities.append(test[['model_outputs',
+                                           'approved_kde_prob',
+                                           'withdrawn_kde_prob',
+                                           withdrawn_col]])
 
     print('Average AP across folds: {}'.format(np.mean(fold_ap)))
     print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
@@ -230,6 +239,9 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
 
     for i, result in enumerate(fold_auc_roc):
         print('AUC for fold {}= {}'.format(i, result))
+
+    output_probs = pd.concat(predictions_densities)
+    output_probs.to_csv(results_path / "output_probs.csv")
 
     results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
         results_path / "{}_metrics.csv".format(logger.version))
