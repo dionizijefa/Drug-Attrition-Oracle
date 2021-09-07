@@ -26,68 +26,15 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
-@click.option('-stratify_chemical_space', default=True)
 @click.option('-save_model', default=False)
 @click.option('-seed', default=0)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_space, seed, save_model):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed, save_model):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
         data = data.sample(frac=1, random_state=seed)  # shuffle
 
     # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
     # append non-unique scaffolds to train at the end
-
-    stratify_key = withdrawn_col
-
-    if stratify_chemical_space :
-        """ generates KDE on UMAP embeddings to stratify train-test splits """
-        print('\n')
-        print('Performing UMAP and KDE grid search CV to stratify the chemical space across folds')
-        #generate morgan fps first
-        data_fps = []
-        for i in data['standardized_smiles']:
-            mol = Chem.MolFromSmiles(i)
-            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
-            array = np.zeros((0,), dtype=np.int8)
-            DataStructs.ConvertToNumpyArray(fp, array)
-            data_fps.append(array)
-
-        umapper = umap.UMAP(
-            n_components=2,
-            metric='jaccard',
-            learning_rate=0.5,
-            low_memory=True,
-            transform_seed=42,
-            random_state=42,
-        )
-        umap_embeddings = umapper.fit_transform(data_fps)
-        data['umap_embeddings'] = umap_embeddings
-        params = {'bandwidth': np.logspace(-1, 1, 20)}
-        withdrawn_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
-        approved_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
-        withdrawn_grid.fit(
-            list(data.loc[data[withdrawn_col] == 1]['umap_embeddings'])
-        )
-        approved_grid.fit(
-            list(data.loc[data[withdrawn_col] == 0]['umap_embeddings'])
-        )
-        data['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(umap_embeddings))
-        data['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
-
-        """
-        first_quartile = data['kde_prob'].describe()['25%']
-        second_quartile = data['kde_prob'].describe()['50%']
-        third_quartile = data['kde_prob'].describe()['75%']
-        data['kde_quartile'] = 'first'
-        data.loc[data['kde_prob'] < first_quartile, 'kde_quartile'] = 'first'
-        data.loc[(data['kde_prob'] > first_quartile) &
-                 (data['kde_prob'] <= second_quartile), 'kde_quartile'] = 'second'
-        data.loc[(data['kde_prob'] > second_quartile) &
-                 (data['kde_prob'] <= third_quartile), 'kde_quartile'] = 'third'
-        data.loc[data['kde_prob'] > third_quartile, 'kde_quartile'] = 'fourth'
-        data['stratify_label'] = data['wd_consensus_1'].astype(str) + data['kde_quartile']
-        stratify_key = 'stratify_label'
-        """
 
     scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
     unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
@@ -105,7 +52,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
     predictions_densities = []
 
     for k, (train_index, test_index) in enumerate(
-            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[stratify_key])
+            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[withdrawn_col])
     ):
 
         conf = Conf(
@@ -144,7 +91,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
         train, val = train_test_split(
             train_set,
             test_size=0.15,
-            stratify=train_set[stratify_key],
+            stratify=train_set[withdrawn_col],
             shuffle=True,
             random_state=seed)
         # append common scaffolds to train
@@ -170,6 +117,51 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
         for index, row in val.iterrows():
             val_data_list.append(smiles2graph(row, withdrawn_col))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
+
+        """ generates KDE on UMAP embeddings to stratify train-test splits """
+        print('\n')
+        print('Performing UMAP and KDE grid search CV to stratify the chemical space across folds')
+        #generate morgan fps first
+        train_fps = []
+        for i in train['standardized_smiles']:
+            mol = Chem.MolFromSmiles(i)
+            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+            array = np.zeros((0,), dtype=np.int8)
+            DataStructs.ConvertToNumpyArray(fp, array)
+            train_fps.append(array)
+
+        umapper = umap.UMAP(
+            n_components=2,
+            metric='jaccard',
+            learning_rate=0.5,
+            low_memory=True,
+            transform_seed=42,
+            random_state=42,
+        )
+        umap_embeddings = umapper.fit_transform(train_fps)
+        train['umap_embeddings'] = umap_embeddings
+        params = {'bandwidth': np.logspace(-1, 1, 20)}
+        withdrawn_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
+        approved_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
+        withdrawn_grid.fit(
+            list(train.loc[data[withdrawn_col] == 1]['umap_embeddings'])
+        )
+        approved_grid.fit(
+            list(train.loc[data[withdrawn_col] == 0]['umap_embeddings'])
+        )
+        train['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(umap_embeddings))
+        train['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
+
+        test_fps = []
+        for i in test['standardized_smiles']:
+            mol = Chem.MolFromSmiles(i)
+            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
+            array = np.zeros((0,), dtype=np.int8)
+            DataStructs.ConvertToNumpyArray(fp, array)
+            test_fps.append(array)
+        test_embeddings = umapper.transform(test_fps)
+        test['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(test_embeddings))
+        test['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(test_embeddings))
 
         model = EGConvNet(
             conf.to_hparams(),
