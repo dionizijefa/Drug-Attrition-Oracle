@@ -2,7 +2,7 @@ from torch_geometric.nn import EGConv, global_mean_pool
 from torch.nn import Sequential, BatchNorm1d, ReLU, Linear, Module, ModuleList
 
 
-class EGConvNet(Module):
+class EGConvModel(Module):
     """Multi aggregators = ['sum', 'mean', 'max'] or
     ['symnorm']"""
     def __init__(self, hidden_channels, num_layers, num_heads, num_bases, aggregator):

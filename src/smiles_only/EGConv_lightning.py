@@ -7,8 +7,9 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import auroc, average_precision
-from EGConv import EGConvNet
+from EGConv import EGConvModel
 import pytorch_lightning as pl
+
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -46,6 +47,7 @@ class Conf:
     def __str__(self):
         return pformat(dataclasses.asdict(self))
 
+
 class EGConvNet(pl.LightningModule, ABC):
     def __init__(
             self,
@@ -55,7 +57,7 @@ class EGConvNet(pl.LightningModule, ABC):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model = EGConvNet(
+        self.model = EGConvModel(
             self.hparams.hidden_channels,
             self.hparams.num_layers,
             self.hparams.num_heads,
@@ -65,7 +67,7 @@ class EGConvNet(pl.LightningModule, ABC):
         pl.seed_everything(hparams['seed'])
 
     def forward(self, data):
-        out = self.model(data.x, data.edge_index, data.batch, None)
+        out = self.model(data.x, data.edge_index, data.batch)
         return out
 
     def training_step(self, batch, batch_idx):

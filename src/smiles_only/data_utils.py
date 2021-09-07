@@ -346,7 +346,7 @@ def smiles2graph(smiles, withdrawn_col):
     #y = withdrawn_col
 
     y = smiles[withdrawn_col]
-    smiles = smiles['smiles']
+    smiles = smiles['standardized_smiles']
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms

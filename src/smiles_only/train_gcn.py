@@ -19,8 +19,9 @@ from EGConv_lightning import Conf, EGConvNet
 
 root = Path(__file__).resolve().parents[2].absolute()
 
+
 @click.command()
-@click.option('-train_path', default='/processing_pipeline/train/train.csv')
+@click.option('-train_data', default='processing_pipeline/train/alldata_min_phase_4_train.csv')
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
@@ -31,12 +32,14 @@ root = Path(__file__).resolve().parents[2].absolute()
 def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_space, seed, save_model):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
-        data = data.sample(frac=1, random_state=seed) # shuffle
+        data = data.sample(frac=1, random_state=seed)  # shuffle
 
     # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
     # append non-unique scaffolds to train at the end
 
-    if stratify_chemical_space == True:
+    stratify_key = withdrawn_col
+
+    if stratify_chemical_space :
         """ generates KDE on UMAP embeddings to stratify train-test splits """
         print('\n')
         print('Performing UMAP and KDE grid search CV to stratify the chemical space across folds')
@@ -75,7 +78,9 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
                  (data['kde_prob'] <= third_quartile), 'kde_quartile'] = 'third'
         data.loc[data['kde_prob'] > third_quartile, 'kde_quartile'] = 'fourth'
 
-    data['stratify_label'] = data['wd_consensus_1'].astype(str) + data['kde_quartile']
+        data['stratify_label'] = data['wd_consensus_1'].astype(str) + data['kde_quartile']
+        stratify_key = 'stratify_label'
+
     scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
     unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
     data_unique_scaffolds = data.loc[data['scaffolds'].isin(unique_scaffolds)]
@@ -83,15 +88,17 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
 
     cv_splitter = StratifiedKFold(
         n_splits=5,
+        shuffle=True,
         random_state=seed,
     )
 
     fold_ap = []
     fold_auc_roc = []
     cv_fold = []
+    predictions_densities = []
 
     for k, (train_index, test_index) in enumerate(
-            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds['stratify_label'])
+            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[stratify_key])
     ):
 
         conf = Conf(
@@ -116,7 +123,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
         early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                             min_delta=0.00,
                                             mode='max',
-                                            patience=15,
+                                            patience=10,
                                             verbose=False)
 
         test = data_unique_scaffolds.iloc[test_index]
@@ -129,8 +136,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
 
         train, val = train_test_split(
             train_set,
-            test_size=0.2,
-            stratify=train_set['stratify_label'],
+            test_size=0.15,
+            stratify=train_set[stratify_key],
             shuffle=True,
             random_state=seed)
         # append common scaffolds to train
@@ -175,7 +182,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
             gpus=[gpu],  # [0]
             logger=logger,  # load from checkpoint instead of resume
             weights_summary='top',
-            callbacks=[early_stop_callback, checkpoint if save_model else None],
+            callbacks=[early_stop_callback] if save_model else [early_stop_callback, checkpoint],
             deterministic=True,
             auto_lr_find=False,
             num_sanity_val_steps=0
@@ -205,6 +212,14 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, stratify_chemical_
         with open(results_path / "classification_results.txt", "a") as file:
             print(results, file=file)
             file.write("\n")
+
+        predictions = []
+        for i in test_loader:
+            predictions.append(model.forward(i).detach().cpu().numpy())
+        predictions = [prediction for sublist in predictions for prediction in sublist]
+        test['model_outputs'] = predictions
+        predictions_densities.append(test[['model_outputs', 'kde_prob', withdrawn_col]])
+
 
     print('Average AP across folds: {}'.format(np.mean(fold_ap)))
     print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
