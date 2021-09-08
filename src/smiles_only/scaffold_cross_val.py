@@ -16,9 +16,7 @@ def scaffold_cross_val(data, withdrawn_col, batch_size, seed):
         random_state=seed,
     )
 
-    train_loaders = []
-    val_loaders = []
-    test_loaders = []
+    loaders = []
     for k, (train_index, test_index) in enumerate(
             cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[withdrawn_col])
     ):
@@ -60,10 +58,8 @@ def scaffold_cross_val(data, withdrawn_col, batch_size, seed):
             val_data_list.append(smiles2graph(row, withdrawn_col))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=batch_size)
 
-        train_loaders.append(train_loader)
-        val_loaders.append(val_loader)
-        test_loaders.append(test_loader)
+        loaders.append([train_loader, val_loader, test_loader])
 
-    return [train_loaders, val_loaders, test_loaders]
+    return loaders
 
 
