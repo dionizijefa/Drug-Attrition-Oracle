@@ -28,7 +28,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-gpu', default=1)
 @click.option('-save_model', default=False)
 @click.option('-seed', default=0)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed, save_model):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu, save_model, seed):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
         data = data.sample(frac=1, random_state=seed)  # shuffle
@@ -87,6 +87,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed, save_model):
         test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
         train_set = data_unique_scaffolds.iloc[train_index]
+        #train_set = pd.concat([train_set, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
 
         train, val = train_test_split(
             train_set,
@@ -94,9 +95,8 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed, save_model):
             stratify=train_set[withdrawn_col],
             shuffle=True,
             random_state=seed)
-        # append common scaffolds to train
-        train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
 
+        train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
         train_data_list = []
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, withdrawn_col))
@@ -139,15 +139,17 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed, save_model):
             random_state=42,
         )
         umap_embeddings = umapper.fit_transform(train_fps)
-        train['umap_embeddings'] = umap_embeddings
+        train = train.reset_index()
+        withdrawn_indices = list(train.loc[train[withdrawn_col] == 1].index)
+        approved_indices = list(train.loc[train[withdrawn_col] == 0].index)
         params = {'bandwidth': np.logspace(-1, 1, 20)}
         withdrawn_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
         approved_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
         withdrawn_grid.fit(
-            list(train.loc[data[withdrawn_col] == 1]['umap_embeddings'])
+            umap_embeddings[withdrawn_indices, :]
         )
         approved_grid.fit(
-            list(train.loc[data[withdrawn_col] == 0]['umap_embeddings'])
+            umap_embeddings[approved_indices, :]
         )
         train['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(umap_embeddings))
         train['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
