@@ -10,10 +10,13 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from rdkit import Chem, DataStructs
 from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearchCV
 from sklearn.neighbors import KernelDensity
+from skopt import gp_minimize
+from skopt.space import Categorical, Integer
+from skopt.utils import use_named_args
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader
 import torch
-from data_utils import smiles2graph, tanimoto_distance_matrix, cluster_fingerprints
+from data_utils import smiles2graph
 import click
 from EGConv_lightning import Conf, EGConvNet
 
@@ -26,222 +29,166 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
-@click.option('-save_model', default=False)
 @click.option('-seed', default=0)
-def main(train_data, dataset, withdrawn_col, batch_size, gpu, save_model, seed):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu, seed):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
         data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
-    # append non-unique scaffolds to train at the end
+    dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
+    dim_2 = Integer(1, 8, name='num_layers')
+    dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
+    dim_4 = Integer(1, 8, name='num_bases')
+    dimensions = [dim_1, dim_2, dim_3, dim_4]
 
-    scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
-    unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
-    data_unique_scaffolds = data.loc[data['scaffolds'].isin(unique_scaffolds)]
+    @use_named_args(dimensions=dimensions)
+    def maximize_ap(hidden_channels, num_layers, num_heads, num_bases):
+        # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
+        # append non-unique scaffolds to train at the end
+        scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
+        unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
+        data_unique_scaffolds = data.loc[data['scaffolds'].isin(unique_scaffolds)]
 
-    cv_splitter = StratifiedKFold(
-        n_splits=5,
-        shuffle=True,
-        random_state=seed,
-    )
-
-    fold_ap = []
-    fold_auc_roc = []
-    cv_fold = []
-    predictions_densities = []
-
-    for k, (train_index, test_index) in enumerate(
-            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[withdrawn_col])
-    ):
-
-        conf = Conf(
-            lr=1e-4,
-            batch_size=batch_size,
-            epochs=100,
-            reduce_lr=True,
-        )
-
-
-        logger = TensorBoardLogger(
-            conf.save_dir,
-            name='EGConv',
-            version='{}'.format(str(int(time()))),
-        )
-
-        # Copy this script and all files used in training
-        log_dir = Path(logger.log_dir)
-        log_dir.mkdir(exist_ok=True, parents=True)
-        shutil.copy(Path(__file__), log_dir)
-
-        early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                            min_delta=0.00,
-                                            mode='max',
-                                            patience=10,
-                                            verbose=False)
-
-        test = data_unique_scaffolds.iloc[test_index]
-        test_data_list = []
-        for index, row in test.iterrows():
-            test_data_list.append(smiles2graph(row, withdrawn_col))
-        test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
-
-        train_set = data_unique_scaffolds.iloc[train_index]
-
-        train, val = train_test_split(
-            train_set,
-            test_size=0.15,
-            stratify=train_set[withdrawn_col],
+        cv_splitter = StratifiedKFold(
+            n_splits=5,
             shuffle=True,
-            random_state=seed)
+            random_state=seed,
+        )
 
-        train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
-        train_data_list = []
-        for index, row in train.iterrows():
-            train_data_list.append(smiles2graph(row, withdrawn_col))
+        fold_ap = []
+        fold_auc_roc = []
+        cv_fold = []
+        for k, (train_index, test_index) in enumerate(
+                cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[withdrawn_col])
+        ):
 
-        # balanced sampling of the minority class
-        withdrawn = train[withdrawn_col].value_counts()[1]
-        approved = train[withdrawn_col].value_counts()[0]
-        class_sample_count = [approved, withdrawn]
-        weights = 1 / torch.Tensor(class_sample_count)
-        samples_weights = weights[train[withdrawn_col].values]
-        sampler = WeightedRandomSampler(samples_weights,
-                                        num_samples=len(samples_weights),
-                                        replacement=True)
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size,
-                                  sampler=sampler)
+            conf = Conf(
+                batch_size=batch_size,
+                reduce_lr=True,
+                hidden_channels=hidden_channels,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                num_bases=num_bases,
+            )
 
-        val_data_list = []
-        for index, row in val.iterrows():
-            val_data_list.append(smiles2graph(row, withdrawn_col))
-        val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
+            logger = TensorBoardLogger(
+                conf.save_dir,
+                name='EGConv',
+                version='{}'.format(str(int(time()))),
+            )
 
+            # Copy this script and all files used in training
+            log_dir = Path(logger.log_dir)
+            log_dir.mkdir(exist_ok=True, parents=True)
+            shutil.copy(Path(__file__), log_dir)
 
-        """
-        # generates KDE on UMAP embeddings to stratify train-test splits
+            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                                min_delta=0.00,
+                                                mode='max',
+                                                patience=10,
+                                                verbose=False)
+
+            test = data_unique_scaffolds.iloc[test_index]
+            test_data_list = []
+            for index, row in test.iterrows():
+                test_data_list.append(smiles2graph(row, withdrawn_col))
+            test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
+
+            train_set = data_unique_scaffolds.iloc[train_index]
+
+            train, val = train_test_split(
+                train_set,
+                test_size=0.15,
+                stratify=train_set[withdrawn_col],
+                shuffle=True,
+                random_state=seed)
+
+            train = pd.concat([train, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
+            train_data_list = []
+            for index, row in train.iterrows():
+                train_data_list.append(smiles2graph(row, withdrawn_col))
+
+            # balanced sampling of the minority class
+            withdrawn = train[withdrawn_col].value_counts()[1]
+            approved = train[withdrawn_col].value_counts()[0]
+            class_sample_count = [approved, withdrawn]
+            weights = 1 / torch.Tensor(class_sample_count)
+            samples_weights = weights[train[withdrawn_col].values]
+            sampler = WeightedRandomSampler(samples_weights,
+                                            num_samples=len(samples_weights),
+                                            replacement=True)
+            train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size,
+                                      sampler=sampler)
+
+            val_data_list = []
+            for index, row in val.iterrows():
+                val_data_list.append(smiles2graph(row, withdrawn_col))
+            val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
+
+            model = EGConvNet(
+                conf.to_hparams(),
+                reduce_lr=conf.reduce_lr,
+            )
+
+            print("Starting training")
+            trainer = pl.Trainer(
+                max_epochs=conf.epochs,
+                gpus=[gpu],  # [0]
+                logger=logger,  # load from checkpoint instead of resume
+                weights_summary='top',
+                callbacks=[early_stop_callback],
+                deterministic=True,
+                auto_lr_find=False,
+                num_sanity_val_steps=0
+            )
+
+            trainer.fit(model, train_loader, val_loader)
+            results = trainer.test(model, test_loader)
+            test_ap = round(results[0]['test_ap'], 3)
+            test_auc = round(results[0]['test_auc'], 3)
+            cv_fold.append(k)
+
+            fold_ap.append(test_ap)
+            fold_auc_roc.append(test_auc)
+
+        print('Average AP across folds: {}'.format(np.mean(fold_ap)))
+        print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
         print('\n')
-        print('Performing UMAP and KDE grid search CV to stratify the chemical space across folds')
-        #generate morgan fps first
-        train_fps = []
-        for i in train['standardized_smiles']:
-            mol = Chem.MolFromSmiles(i)
-            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
-            array = np.zeros((0,), dtype=np.int8)
-            DataStructs.ConvertToNumpyArray(fp, array)
-            train_fps.append(array)
 
-        umapper = umap.UMAP(
-            n_components=2,
-            metric='jaccard',
-            learning_rate=0.5,
-            low_memory=True,
-            transform_seed=42,
-            random_state=42,
-        )
-        
-        umap_embeddings = umapper.fit_transform(train_fps)
-        train = train.reset_index()
-        withdrawn_indices = list(train.loc[train[withdrawn_col] == 1].index)
-        approved_indices = list(train.loc[train[withdrawn_col] == 0].index)
-        params = {'bandwidth': np.logspace(-1, 1, 20)}
-        withdrawn_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
-        approved_grid = GridSearchCV(KernelDensity(), params, n_jobs=-1)
-        withdrawn_grid.fit(
-            umap_embeddings[withdrawn_indices, :]
-        )
-        approved_grid.fit(
-            umap_embeddings[approved_indices, :]
-        )
-        train['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(umap_embeddings))
-        train['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
-        """
+        for i, result in enumerate(fold_ap):
+            print('AP for fold {}= {}'.format(i, result))
 
-        test_fps = []
-        for i in test['standardized_smiles']:
-            mol = Chem.MolFromSmiles(i)
-            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
-            array = np.zeros((0,), dtype=np.int8)
-            DataStructs.ConvertToNumpyArray(fp, array)
-            test_fps.append(array)
-        test_embeddings = umapper.transform(test_fps)
-        test['withdrawn_kde_prob'] = np.exp(withdrawn_grid.best_estimator_.score_samples(test_embeddings))
-        test['approved_kde_prob'] = np.exp(approved_grid.best_estimator_.score_samples(umap_embeddings))
+        for i, result in enumerate(fold_auc_roc):
+            print('AUC for fold {}= {}'.format(i, result))
 
-        model = EGConvNet(
-            conf.to_hparams(),
-            reduce_lr=conf.reduce_lr,
-        )
+        return 1 / np.mean(fold_ap)
 
-        checkpoint = ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-        )
+    start = time()
+    res = gp_minimize(maximize_ap,  # the function to minimize
+                      dimensions=dimensions,  # the bounds on each dimension of x
+                      acq_func="EI",  # the acquisition function
+                      n_calls=25,  # the number of evaluations of f
+                      n_random_starts=5,  # the number of random initialization points
+                      random_state=1234)  # the random seed
+    end = time()
+    elapsed = (end-start) / 3600
 
-        print("Starting training")
-        trainer = pl.Trainer(
-            max_epochs=conf.epochs,
-            gpus=[gpu],  # [0]
-            logger=logger,  # load from checkpoint instead of resume
-            weights_summary='top',
-            callbacks=[early_stop_callback] if save_model else [early_stop_callback, checkpoint],
-            deterministic=True,
-            auto_lr_find=False,
-            num_sanity_val_steps=0
-        )
+    print('Value of the minimum: {}'.format(res.fun))
+    print('Res space: {}'.format(res.x))
+    print('Time elapsed in hrs: {}'.format(elapsed))
 
-        trainer.fit(model, train_loader, val_loader)
-        results = trainer.test(model, test_loader)
-        results_path = Path(root / "results")
-        test_ap = round(results[0]['test_ap'], 3)
-        test_auc = round(results[0]['test_auc'], 3)
-        cv_fold.append(k)
-
-        fold_ap.append(test_ap)
-        fold_auc_roc.append(test_auc)
-
-        if not results_path.exists():
-            results_path.mkdir(exist_ok=True, parents=True)
-            with open(results_path / "classification_results.txt", "w") as file:
-                file.write("Classification results")
-                file.write("\n")
-
-        results = {'Test AP': test_ap,
-                   'Test AUC-ROC': test_auc,
-                   'CV_fold': cv_fold}
-        version = {'version': logger.version}
-        results = {logger.name: [results, version]}
-        with open(results_path / "classification_results.txt", "a") as file:
-            print(results, file=file)
+    results_path = Path(root / 'bayes_opt')
+    if not results_path.exists():
+        results_path.mkdir(exist_ok=True, parents=True)
+        with open(results_path / "bayes_opt.txt", "w") as file:
+            file.write("Bayes opt - EGConv")
             file.write("\n")
 
-        predictions = []
-        for i in test_loader:
-            predictions.append(model.forward(i).detach().cpu().numpy())
-        predictions = [prediction for sublist in predictions for prediction in sublist]
-        test['model_outputs'] = predictions
-        predictions_densities.append(test[['model_outputs',
-                                           'approved_kde_prob',
-                                           'withdrawn_kde_prob',
-                                           withdrawn_col]])
-
-    print('Average AP across folds: {}'.format(np.mean(fold_ap)))
-    print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
-    print('\n')
-
-    for i, result in enumerate(fold_ap):
-        print('AP for fold {}= {}'.format(i, result))
-
-    for i, result in enumerate(fold_auc_roc):
-        print('AUC for fold {}= {}'.format(i, result))
-
-    output_probs = pd.concat(predictions_densities)
-    output_probs.to_csv(results_path / "output_probs.csv")
-
-    results_df = pd.DataFrame({'CV_fold': cv_fold, 'AP': fold_ap, 'AUC': fold_auc_roc}).to_csv(
-        results_path / "{}_metrics.csv".format(logger.version))
+        with open(results_path / "bayes_opt.txt", "a") as file:
+            print('Maximum AP: {}'.format(res.fun), file=file)
+            print('Res space: {}'.format(res.space), file=file)
+            file.write("\n")
+            file.write("\n")
 
 
 if __name__ == '__main__':
