@@ -204,69 +204,7 @@ def main(train_data, dataset, withdrawn_col, batch_size, gpu):
 
     @use_named_args(dimensions=dimensions)
     def maximize_ap(hidden_channels, num_layers, num_heads, num_bases):
-        train_test_splitter = StratifiedKFold(n_splits=5)
 
-        fold_ap = []
-
-        for k, (train_index, test_index) in enumerate(
-                train_test_splitter.split(data, data[withdrawn_col])
-        ):
-
-            conf = Conf(
-                batch_size=batch_size,
-                reduce_lr=True,
-                hidden_channels=hidden_channels,
-                num_layers=num_layers,
-                num_heads=num_heads,
-                num_bases=num_bases,
-            )
-
-            logger = TensorBoardLogger(
-                conf.save_dir,
-                name='transformer_net',
-                version='{}'.format(str(int(time()))),
-            )
-
-            # Copy this script and all files used in training
-            log_dir = Path(logger.log_dir)
-            log_dir.mkdir(exist_ok=True, parents=True)
-            shutil.copy(Path(__file__), log_dir)
-
-            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                                min_delta=0.00,
-                                                mode='max',
-                                                patience=10,
-                                                verbose=False)
-
-            model_checkpoint = ModelCheckpoint(
-                    dirpath=(logger.log_dir + '/checkpoint/'),
-                    monitor='val_ap_epoch',
-                    mode='max',
-                    save_top_k=1,
-            )
-
-            test = data.iloc[test_index]
-            test_data_list = []
-            for index, row in test.iterrows():
-                test_data_list.append(smiles2graph(row, withdrawn_col))
-            test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
-
-            train_set = data.iloc[train_index]
-
-            train, val = train_test_split(train_set, test_size=0.15, stratify=train_set[withdrawn_col], shuffle=True)
-
-            train_data_list = []
-            for index, row in train.iterrows():
-                train_data_list.append(smiles2graph(row, withdrawn_col))
-            train_loader = DataLoader(train_data_list, num_workers=0, batch_size=conf.batch_size)
-
-            val_data_list = []
-            for index, row in val.iterrows():
-                val_data_list.append(smiles2graph(row, withdrawn_col))
-            val_loader = DataLoader(val_data_list, num_workers=0, batch_size=conf.batch_size)
-
-            pos_weight = torch.Tensor([(len(train) / len(train.loc[train['withdrawn'] == 1]))])
-            conf.pos_weight = pos_weight
 
             model = TransformerNet(
                 conf.to_hparams(),
