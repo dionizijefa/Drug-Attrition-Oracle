@@ -1,4 +1,5 @@
 import shutil
+from itertools import zip_longest
 from pathlib import Path
 from time import time
 import numpy as np
@@ -11,23 +12,22 @@ import click
 from EGConv_lightning import Conf, EGConvNet
 from scaffold_cross_val import scaffold_cross_val
 from callbacks import early_stop_callback
+from torch import cat
 
 root = Path(__file__).resolve().parents[2].absolute()
 
 
 @click.command()
 @click.option('-train_data', default='processing_pipeline/train/alldata_min_phase_4_train.csv')
-@click.option('-dataset', default='all')
 @click.option('-bayes_opt', default=False)
 @click.option('-conformal', default=False)
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
 @click.option('-seed', default=0)
-def main(train_data, dataset, withdrawn_col, bayes_opt, conformal, batch_size, gpu, seed):
-    if dataset == 'all':
-        data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
-        data = data.sample(frac=1, random_state=seed)  # shuffle
+def main(train_data, withdrawn_col, bayes_opt, conformal, batch_size, gpu, seed):
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    data = data.sample(frac=1, random_state=seed)  # shuffle
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
@@ -123,7 +123,6 @@ def main(train_data, dataset, withdrawn_col, bayes_opt, conformal, batch_size, g
                 num_heads=res[2],
                 num_bases=res[3],
             )
-
         else:
             conf = Conf(
                 batch_size=batch_size,
@@ -153,13 +152,28 @@ def main(train_data, dataset, withdrawn_col, bayes_opt, conformal, batch_size, g
             train_loader, val_loader, test_loader = fold
             trainer.fit(model, train_loader, val_loader)
 
+            #calibration data
             train_probabilities = []
+            targets = []
             for i in train_loader:
-                train_probabilities.append(model.forward(i).detach().cpu().numpy())
-            train_probabilities = [prediction for sublist in train_probabilities for prediction in sublist]
-            train_probabilities = train_probabilities.sort()
-            print(train_probabilities)
+                train_probabilities.append(model.forward(i))
+                targets.append(i.y)
+            train_probabilities = np.array(cat(train_probabilities).detach().cpu().numpy().flatten())
+            targets = np.array(cat(targets).detach().cpu().numpy().flatten())
+            calibration_df = pd.DataFrame({'probabilities': train_probabilities, 'class': targets})
+            approved_probabilities = calibration_df.loc[calibration_df['class'] == 0]['probabilities'].values
+            withdrawn_probabilities = calibration_df.loc[calibration_df['class'] == 1]['probabilities'].values
+            approved_probabilities = np.sort(approved_probabilities)
+            withdrawn_probabilities = np.sort(approved_probabilities)
+            print(approved_probabilities)
             print(error)
+
+            #test data
+            test_probabilities = []
+            for i in test_loader:
+                test_probabilities.append(model.forward(i))
+            test_probabilities = np.array(cat(test_probabilities).detach().cpu().numpy().flatten())
+           # for i in test_probabilities:
 
 
 if __name__ == '__main__':
