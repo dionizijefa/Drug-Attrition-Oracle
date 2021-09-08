@@ -24,39 +24,17 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/alldata_min_phase_4_train.csv')
 @click.option('-dataset', default='all')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-butina_cluster', default='True')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
 @click.option('-save_model', default=False)
 @click.option('-seed', default=0)
-def main(train_data, dataset, withdrawn_col, butina_cluster, batch_size, gpu, save_model, seed):
+def main(train_data, dataset, withdrawn_col, batch_size, gpu, save_model, seed):
     if dataset == 'all':
         data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
         data = data.sample(frac=1, random_state=seed)  # shuffle
 
     # cross val on unique scaffolds -> test is only on unique scaffolds, val only on unique scaffolds
     # append non-unique scaffolds to train at the end
-
-    stratify_col = withdrawn_col
-    if butina_cluster:
-        data_fps = []
-        for i in data['standardized_smiles']:
-            mol = Chem.MolFromSmiles(i)
-            fp = Chem.AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024)
-            # array = np.zeros((0,), dtype=np.int8)
-            # DataStructs.ConvertToNumpyArray(fp, array)
-            # data_fps.append(array)
-            data_fps.append(fp)
-
-        clusters = cluster_fingerprints(data_fps)
-        data["cluster"] = 0
-        for i in range(0, len(clusters)):
-            mols_in_cluster = list(clusters[i])
-            name = 'cluster_{}'.format(i)
-            data.loc[data.index.isin(mols_in_cluster), 'cluster'] = name
-
-        data['stratify_col'] = data[withdrawn_col].astype(str) + data["cluster"]
-        stratify_col = 'stratify_col'
 
     scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
     unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
@@ -74,7 +52,7 @@ def main(train_data, dataset, withdrawn_col, butina_cluster, batch_size, gpu, sa
     predictions_densities = []
 
     for k, (train_index, test_index) in enumerate(
-            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[stratify_col])
+            cv_splitter.split(data_unique_scaffolds, data_unique_scaffolds[withdrawn_col])
     ):
 
         conf = Conf(
@@ -109,12 +87,11 @@ def main(train_data, dataset, withdrawn_col, butina_cluster, batch_size, gpu, sa
         test_loader = DataLoader(test_data_list, num_workers=0, batch_size=conf.batch_size)
 
         train_set = data_unique_scaffolds.iloc[train_index]
-        train_set = pd.concat([train_set, data.loc[~data['scaffolds'].isin(unique_scaffolds)]])
 
         train, val = train_test_split(
             train_set,
             test_size=0.15,
-            stratify=train_set[stratify_col],
+            stratify=train_set[withdrawn_col],
             shuffle=True,
             random_state=seed)
 
