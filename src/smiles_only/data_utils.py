@@ -13,9 +13,10 @@ import numpy as np
 import pandas as pd
 import torch
 from ogb.utils.features import atom_to_feature_vector, bond_to_feature_vector
-from rdkit import Chem, RDConfig
+from rdkit import Chem, RDConfig, DataStructs
 from rdkit.Chem import AllChem, ChemicalFeatures
 from rdkit.Chem import MolFromSmiles
+from rdkit.ML.Cluster.Butina import ClusterData
 from sklearn.metrics import pairwise_distances
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
@@ -575,3 +576,28 @@ def smiles2graph_descriptors(data, withdrawn_col, descriptors_from):
 
     return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], descriptors=graph['descriptors'],
                 feature_names=names)
+
+def tanimoto_distance_matrix(fp_list):
+    """Calculate distance matrix for fingerprint list"""
+    dissimilarity_matrix = []
+    # Notice how we are deliberately skipping the first and last items in the list
+    # because we don't need to compare them against themselves
+    for i in range(1, len(fp_list)):
+        # Compare the current fingerprint against all the previous ones in the list
+        similarities = DataStructs.BulkTanimotoSimilarity(fp_list[i], fp_list[:i])
+        # Since we need a distance matrix, calculate 1-x for every element in similarity matrix
+        dissimilarity_matrix.extend([1 - x for x in similarities])
+    return dissimilarity_matrix
+
+def cluster_fingerprints(fingerprints, cutoff=0.8):
+    """Cluster fingerprints
+    Parameters:
+        fingerprints
+        cutoff: threshold for the clustering
+    """
+    # Calculate Tanimoto distance matrix
+    distance_matrix = tanimoto_distance_matrix(fingerprints)
+    # Now cluster the data with the implemented Butina algorithm:
+    clusters = ClusterData(distance_matrix, len(fingerprints), cutoff, isDistData=True)
+    clusters = sorted(clusters, key=len, reverse=True)
+    return clusters
