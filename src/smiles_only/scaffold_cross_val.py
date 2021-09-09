@@ -62,4 +62,14 @@ def scaffold_cross_val(data, withdrawn_col, batch_size, seed):
 
     return loaders
 
+def create_loader(data, withdrawn_col, batch_size):
+    data_list = []
+    for index, row in data.iterrows():
+        data_list.append(smiles2graph(row, withdrawn_col))
+
+    data_loader = DataLoader(data_list, num_workers=0, batch_size=batch_size)
+
+
+
+
 

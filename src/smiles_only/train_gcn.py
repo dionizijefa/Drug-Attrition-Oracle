@@ -10,7 +10,7 @@ from skopt.space import Categorical, Integer
 from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
-from scaffold_cross_val import scaffold_cross_val
+from scaffold_cross_val import scaffold_cross_val, create_loader
 from callbacks import early_stop_callback
 from torch import cat
 
@@ -19,13 +19,14 @@ root = Path(__file__).resolve().parents[2].absolute()
 
 @click.command()
 @click.option('-train_data', default='processing_pipeline/train/alldata_min_phase_4_train.csv')
+@click.option('-test_data', default='processing_pipeline/test/alldata_min_phase_4_test.csv')
 @click.option('-bayes_opt', default=False)
 @click.option('-conformal', default=False)
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-gpu', default=1)
 @click.option('-seed', default=0)
-def main(train_data, withdrawn_col, bayes_opt, conformal, batch_size, gpu, seed):
+def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size, gpu, seed):
     data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
@@ -153,27 +154,29 @@ def main(train_data, withdrawn_col, bayes_opt, conformal, batch_size, gpu, seed)
             trainer.fit(model, train_loader, val_loader)
 
             #calibration data
-            train_probabilities = []
+            calib_probabilities = []
             targets = []
-            for i in train_loader:
-                train_probabilities.append(model.forward(i))
+            for i in test_loader:
+                calib_probabilities.append(model.forward(i))
                 targets.append(i.y)
-            train_probabilities = np.array(cat(train_probabilities).detach().cpu().numpy().flatten())
+            calib_probabilities = np.exp(np.array(cat(calib_probabilities).detach().cpu().numpy().flatten()))
+            calib_probabilities = calib_probabilities / (1 - calib_probabilities)
             targets = np.array(cat(targets).detach().cpu().numpy().flatten())
-            calibration_df = pd.DataFrame({'probabilities': train_probabilities, 'class': targets})
+            calibration_df = pd.DataFrame({'probabilities': calib_probabilities, 'class': targets})
             approved_probabilities = calibration_df.loc[calibration_df['class'] == 0]['probabilities'].values
+            approved_probabilities = 1 - approved_probabilities
             withdrawn_probabilities = calibration_df.loc[calibration_df['class'] == 1]['probabilities'].values
             approved_probabilities = np.sort(approved_probabilities)
             withdrawn_probabilities = np.sort(approved_probabilities)
-            print(approved_probabilities)
-            print(error)
 
-            #test data
-            test_probabilities = []
-            for i in test_loader:
-                test_probabilities.append(model.forward(i))
-            test_probabilities = np.array(cat(test_probabilities).detach().cpu().numpy().flatten())
+            test = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+            test_loader = create_loader(test)
+            for i in test_loader =
            # for i in test_probabilities:
+
+            for i in test_probabilities:
+                p_value_approved = np.searchsorted(approved_probabilities, i)
+                p_value_withdrawn = np.searchsorted(withdrawn_probabilities, )
 
 
 if __name__ == '__main__':
