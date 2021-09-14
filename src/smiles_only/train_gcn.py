@@ -187,6 +187,7 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
                 p_values_withdrawn.append(np.searchsorted(withdrawn_probabilities, i))
 
             print(p_values_approved)
+            print(error)
 
 
 if __name__ == '__main__':
