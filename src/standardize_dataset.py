@@ -29,7 +29,8 @@ def standardize_dataset(dataset_path, smiles_col, drop_duplicates):
             standardized_smiles.append(new_mol)
         except Exception as e:
             print(e)
-            standardized_smiles.append(0)
+            print(smiles)
+            standardized_smiles.append(np.nan)
             list_of_dropped.append(index)
         try:
             # generate generic scaffolds -> all atom types are C and all bonds are single -> more strict split
@@ -43,7 +44,7 @@ def standardize_dataset(dataset_path, smiles_col, drop_duplicates):
     list_of_dropped.to_csv(data_path / '{}_standardizer_dropped_mols.csv'.format(output_name))
     data['standardized_smiles'] = standardized_smiles
     data['scaffolds'] = scaffolds_generic
-    data = data.loc[data['standardized_smiles'] != 0]  # drop molecules that have not passed standardizer
+    data['standardized_smiles'] = data['standardized_smiles'].fillna(data[smiles_col])
 
     #post hoc add labels - duplicates are dropped, first value is kept, this fixed the consensus count
     wd_wd = list(data.loc[data['wd_withdrawn'] == 1]['chembl_id'])

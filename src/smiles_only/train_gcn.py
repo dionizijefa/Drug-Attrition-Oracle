@@ -18,8 +18,8 @@ root = Path(__file__).resolve().parents[2].absolute()
 
 
 @click.command()
-@click.option('-train_data', default='processing_pipeline/train/alldata_min_phase_4_train.csv')
-@click.option('-test_data', default='processing_pipeline/test/alldata_min_phase_4_test.csv')
+@click.option('-train_data', default='processing_pipeline/train/train.csv')
+@click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-bayes_opt', default=False)
 @click.option('-conformal', default=False)
 @click.option('-withdrawn_col', default='wd_consensus_1')
@@ -60,7 +60,7 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
                 max_epochs=conf.epochs,
                 gpus=[gpu],  # [0]  # load from checkpoint instead of resume
                 weights_summary='top',
-                callbacks=[early_stop_callback],
+                callbacks=[early_stop_callback, model_checkpoint_callback],
                 deterministic=True,
                 auto_lr_find=False,
                 num_sanity_val_steps=0
@@ -75,7 +75,7 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
             fold_auroc.append(test_auc)
 
         print('Average AP across folds: {}'.format(np.mean(fold_ap)))
-        print('Average AUC across folds: {}'.format(np.mean(fold_auc_roc)))
+        print('Average AUC across folds: {}'.format(np.mean(fold_auroc)))
         print('\n')
 
         for i, result in enumerate(fold_ap):
@@ -116,6 +116,7 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
 
     if conformal:
         if bayes_opt:
+            # use results from the previous step
             conf = Conf(
                 batch_size=batch_size,
                 reduce_lr=True,
@@ -125,6 +126,7 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
                 num_bases=res[3],
             )
         else:
+            #use defaults
             conf = Conf(
                 batch_size=batch_size,
                 reduce_lr=True,
@@ -150,33 +152,41 @@ def main(train_data, test_data, withdrawn_col, bayes_opt, conformal, batch_size,
                 num_sanity_val_steps=0
             )
 
-            train_loader, val_loader, test_loader = fold
+            train_loader, val_loader, calib_loader = fold
             trainer.fit(model, train_loader, val_loader)
 
             #calibration data
             calib_probabilities = []
-            targets = []
-            for i in test_loader:
+            #targets = []
+            for i in calib_loader:
                 calib_probabilities.append(model.forward(i))
-                targets.append(i.y)
+                #targets.append(i.y)
             calib_probabilities = np.exp(np.array(cat(calib_probabilities).detach().cpu().numpy().flatten()))
             calib_probabilities = calib_probabilities / (1 - calib_probabilities)
-            targets = np.array(cat(targets).detach().cpu().numpy().flatten())
+            #targets = np.array(cat(targets).detach().cpu().numpy().flatten())
             calibration_df = pd.DataFrame({'probabilities': calib_probabilities, 'class': targets})
             approved_probabilities = calibration_df.loc[calibration_df['class'] == 0]['probabilities'].values
             approved_probabilities = 1 - approved_probabilities
             withdrawn_probabilities = calibration_df.loc[calibration_df['class'] == 1]['probabilities'].values
             approved_probabilities = np.sort(approved_probabilities)
-            withdrawn_probabilities = np.sort(approved_probabilities)
+            withdrawn_probabilities = np.sort(withdrawn_probabilities)
 
             test = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
             test_loader = create_loader(test)
-            for i in test_loader =
-           # for i in test_probabilities:
+            test_probabilities = []
+            targets = []
+            for i in test_loader:
+                test_probabilities.append(model.forward(i))
+                targets.append(i.y)
+            targets = np.array(cat(targets).detach().cpu().numpy().flatten())
 
+            p_values_approved = []
+            p_values_withdrawn = []
             for i in test_probabilities:
-                p_value_approved = np.searchsorted(approved_probabilities, i)
-                p_value_withdrawn = np.searchsorted(withdrawn_probabilities, )
+                p_values_approved.append(np.searchsorted(approved_probabilities, i))
+                p_values_withdrawn.append(np.searchsorted(withdrawn_probabilities, i))
+
+            print(p_values_approved)
 
 
 if __name__ == '__main__':
