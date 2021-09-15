@@ -69,6 +69,8 @@ def create_loader(data, withdrawn_col, batch_size):
 
     data_loader = DataLoader(data_list, num_workers=0, batch_size=batch_size)
 
+    return data_loader
+
 
 
 
