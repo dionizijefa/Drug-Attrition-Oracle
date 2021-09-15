@@ -11,6 +11,7 @@ path = Path(__file__).resolve().parents[1].absolute()
 @click.option('-seed', help='Random seed of the split', default=0)
 def train_test_split(dataset_path, seed):
     data = pd.read_csv(dataset_path, index_col=0)
+    data = data.sample(frac=1) # shuffle
 
     scaffolds_df = pd.DataFrame(data['scaffolds'].value_counts())
     unique_scaffolds = list(scaffolds_df.loc[scaffolds_df['scaffolds'] == 1].index)
@@ -23,6 +24,7 @@ def train_test_split(dataset_path, seed):
     train.to_csv(path / 'data/processing_pipeline/train/train.csv')
 
     print('Data split to train and test set')
+
 
 if __name__ == "__main__":
     train_test_split()
