@@ -7,7 +7,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 import pandas as pd
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
-from data_utils import smiles2graph
+from src.transformer.data_utils import smiles2graph
 from torch import Tensor, cat
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
