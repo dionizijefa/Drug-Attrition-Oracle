@@ -206,3 +206,6 @@ def main(
             print('AUC on the outer test: {}'.format(test_auc))
             file.write("\n")
             file.write("\n")
+
+if __name__ == '__main__':
+    main()
