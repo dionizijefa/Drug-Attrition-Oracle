@@ -4,6 +4,7 @@ from time import time
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+from sklearn.model_selection import train_test_split
 from skopt import gp_minimize
 from skopt.space import Categorical, Integer
 from skopt.utils import use_named_args
@@ -17,6 +18,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 
 @click.command()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
+@click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-batch_size', default=16)
 @click.option('-epochs', default=100)
@@ -114,6 +116,7 @@ def main(
 
         return 1 / np.mean(fold_ap)
 
+    print('Starting Bayesian optimization')
     start = time()
     res = gp_minimize(inverse_ap,  # minimize the inverse of average precision
                       dimensions=dimensions,  # hyperparams
@@ -127,6 +130,66 @@ def main(
     print('Value of the minimum: {}'.format(res.fun))
     print('Res space: {}'.format(res.x))
     print('Time elapsed in hrs: {}'.format(elapsed))
+    print('\n')
+
+    print('Testing the optimized model on the test set')
+
+    conf = Conf(
+        batch_size=batch_size,
+        reduce_lr=True,
+        hidden_channels=res.x[0],
+        num_layers=res.x[1],
+        num_heads=res.x[2],
+        num_bases=res.x[3],
+        seed=seed
+    )
+
+    model = EGConvNet(
+        conf.to_hparams(),
+        reduce_lr=conf.reduce_lr,
+    )
+
+    logger = TensorBoardLogger(
+        conf.save_dir,
+        name='egconv_bayes_opt',
+        version='{}'.format(str(int(time()))),
+    )
+
+    model_checkpoint = ModelCheckpoint(
+        dirpath=(logger.log_dir + '/checkpoint/'),
+        monitor='val_ap_epoch',
+        mode='max',
+        save_top_k=1,
+    )
+
+    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                        min_delta=0.00,
+                                        mode='max',
+                                        patience=10,
+                                        verbose=False)
+
+    print("Starting training")
+    trainer = pl.Trainer(
+        max_epochs=epochs,
+        gpus=[gpu],  # [0]  # load from checkpoint instead of resume
+        weights_summary='top',
+        callbacks=[early_stop_callback, model_checkpoint],
+        deterministic=True,
+        auto_lr_find=False,
+        num_sanity_val_steps=0
+    )
+    train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], seed=seed)
+    train_loader = create_loader(train, withdrawn_col, batch_size)
+    val_loader = create_loader(val, withdrawn_col, batch_size)
+
+    trainer.fit(model, train_loader, val_loader)
+    results = trainer.test(model, outer_test_loader)
+    test_ap = round(results[0]['test_ap'], 3)
+    test_auc = round(results[0]['test_auc'], 3)
+
+    print('\n')
+    print('AP of the outer test set with optimized parameters: '.format(test_ap))
+    print('AUC of the outer test set with optimized parameters: '.format(test_auc))
 
     results_path = Path(root / 'bayes_opt')
     if not results_path.exists():
@@ -139,7 +202,7 @@ def main(
             print('Target label: {}'.format(withdrawn_col))
             print('Maximum AP: {}'.format(1/res.fun), file=file)
             print('Res space: {}'.format(res.space), file=file)
+            print('AP on the outer test: {}'.format(test_ap))
+            print('AUC on the outer test: {}'.format(test_auc))
             file.write("\n")
             file.write("\n")
-
-

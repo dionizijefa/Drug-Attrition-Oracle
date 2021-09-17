@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import numpy as np
 from rdkit import RDConfig, Chem
 from rdkit.Chem import HybridizationType, ChemicalFeatures
@@ -7,7 +6,6 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 import pandas as pd
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
-from src.transformer.data_utils import smiles2graph
 from torch import Tensor, cat
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
