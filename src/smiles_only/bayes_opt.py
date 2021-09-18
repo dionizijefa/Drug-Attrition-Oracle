@@ -6,13 +6,12 @@ import pandas as pd
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 from skopt import gp_minimize
-from skopt.space import Categorical, Integer
+from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
-from data_func import cross_val, create_loader, calibrate, conformal_prediction
+from data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
-from pytorch_lightning.loggers import TensorBoardLogger
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -20,10 +19,9 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-batch_size', default=16)
+@click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
-@click.option('-production', default=False)
 @click.option('-seed', default=0)
 def main(
         train_data,
@@ -37,17 +35,18 @@ def main(
     data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / test_data)[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
     outer_test_loader = create_loader(test_data, withdrawn_col, batch_size)
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
     dim_4 = Integer(1, 8, name='num_bases')
-    dimensions = [dim_1, dim_2, dim_3, dim_4]
+    dim_5 = Real(1e-5, 1e-3, name='lr')
+    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5]
 
     @use_named_args(dimensions=dimensions)
-    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases):
+    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases, lr):
         fold_ap = []
         fold_auroc = []
         conf = Conf(
@@ -57,7 +56,8 @@ def main(
             num_layers=num_layers,
             num_heads=num_heads,
             num_bases=num_bases,
-            seed=seed
+            lr=lr,
+            seed=seed,
         )
 
         for fold in cross_val(data, withdrawn_col, batch_size, seed):
@@ -66,20 +66,7 @@ def main(
                 reduce_lr=conf.reduce_lr,
             )
 
-            logger = TensorBoardLogger(
-                conf.save_dir,
-                name='egconv_bayes_opt',
-                version='{}'.format(str(int(time()))),
-            )
-
-            model_checkpoint = ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-            )
-
-            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+            early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
                                                 min_delta=0.00,
                                                 mode='max',
                                                 patience=10,
@@ -90,7 +77,8 @@ def main(
                 max_epochs=epochs,
                 gpus=[gpu],  # [0]  # load from checkpoint instead of resume
                 weights_summary='top',
-                callbacks=[early_stop_callback, model_checkpoint],
+                callbacks=[early_stop_callback],
+                logger=False,
                 deterministic=True,
                 auto_lr_find=False,
                 num_sanity_val_steps=0
@@ -114,7 +102,7 @@ def main(
         for i, result in enumerate(fold_auroc):
             print('AUC for fold {}= {}'.format(i, result))
 
-        return 1 / np.mean(fold_ap)
+        return 1 / np.mean(fold_auroc)
 
     print('Starting Bayesian optimization')
     start = time()
@@ -141,6 +129,7 @@ def main(
         num_layers=res.x[1],
         num_heads=res.x[2],
         num_bases=res.x[3],
+        lr=res.x[4],
         seed=seed
     )
 
@@ -149,20 +138,7 @@ def main(
         reduce_lr=conf.reduce_lr,
     )
 
-    logger = TensorBoardLogger(
-        conf.save_dir,
-        name='egconv_bayes_opt',
-        version='{}'.format(str(int(time()))),
-    )
-
-    model_checkpoint = ModelCheckpoint(
-        dirpath=(logger.log_dir + '/checkpoint/'),
-        monitor='val_ap_epoch',
-        mode='max',
-        save_top_k=1,
-    )
-
-    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+    early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
                                         min_delta=0.00,
                                         mode='max',
                                         patience=10,
@@ -173,12 +149,13 @@ def main(
         max_epochs=epochs,
         gpus=[gpu],  # [0]  # load from checkpoint instead of resume
         weights_summary='top',
-        callbacks=[early_stop_callback, model_checkpoint],
+        callbacks=[early_stop_callback],
         deterministic=True,
         auto_lr_find=False,
-        num_sanity_val_steps=0
+        num_sanity_val_steps=0,
+        logger=False
     )
-    train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], seed=seed)
+    train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], random_state=seed)
     train_loader = create_loader(train, withdrawn_col, batch_size)
     val_loader = create_loader(val, withdrawn_col, batch_size)
 
@@ -188,8 +165,8 @@ def main(
     test_auc = round(results[0]['test_auc'], 3)
 
     print('\n')
-    print('AP of the outer test set with optimized parameters: '.format(test_ap))
-    print('AUC of the outer test set with optimized parameters: '.format(test_auc))
+    print('AP of the outer test set with optimized parameters: {}'.format(test_ap))
+    print('AUC of the outer test set with optimized parameters: {}'.format(test_auc))
 
     results_path = Path(root / 'bayes_opt')
     if not results_path.exists():
@@ -198,14 +175,14 @@ def main(
             file.write("Bayes opt - EGConv")
             file.write("\n")
 
-        with open(results_path / "bayes_opt.txt", "a") as file:
-            print('Target label: {}'.format(withdrawn_col))
-            print('Maximum AP: {}'.format(1/res.fun), file=file)
-            print('Res space: {}'.format(res.space), file=file)
-            print('AP on the outer test: {}'.format(test_ap))
-            print('AUC on the outer test: {}'.format(test_auc))
-            file.write("\n")
-            file.write("\n")
+    with open(results_path / "bayes_opt.txt", "a") as file:
+        print('Target label: {}'.format(withdrawn_col))
+        print('Maximum AP: {}'.format(1/res.fun), file=file)
+        print('Res space: {}'.format(res.space), file=file)
+        print('AP on the outer test: {}'.format(test_ap))
+        print('AUC on the outer test: {}'.format(test_auc))
+        file.write("\n")
+        file.write("\n")
 
 if __name__ == '__main__':
     main()
