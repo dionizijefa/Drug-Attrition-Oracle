@@ -4,9 +4,6 @@ from time import time
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
-from skopt import gp_minimize
-from skopt.space import Categorical, Integer
-from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
 from data_func import cross_val, create_loader, calibrate, conformal_prediction
@@ -20,14 +17,14 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-batch_size', default=16)
+@click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
 @click.option('-production', default=False)
-@click.option('-hidden')
-@click.option('-layers')
-@click.option('-heads')
-@click.option('-bases')
+@click.option('-hidden', default=1024)
+@click.option('-layers', default=4)
+@click.option('-heads', default=4)
+@click.option('-bases', default=3)
 @click.option('-seed', default=0)
 def main(
         train_data,
@@ -56,7 +53,8 @@ def main(
         num_layers=layers,
         num_heads=heads,
         num_bases=bases,
-        seed=seed
+        seed=seed,
+        lr=0.000169,
     )
 
     cross_approved_p = []

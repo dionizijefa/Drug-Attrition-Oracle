@@ -36,7 +36,16 @@ def main(
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
     test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+
+    if withdrawn_col == 'wd_withdrawn':
+        data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
+        test_data['wd_withdrawn'] = test_data['wd_withdrawn'].fillna(0)
+    else:
+        data = data.dropna(subset=[withdrawn_col])  # some molecules don't share all labels
+        test_data = test_data.dropna(subset=[withdrawn_col])
+
     outer_test_loader = create_loader(test_data, withdrawn_col, batch_size)
+
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
@@ -81,7 +90,8 @@ def main(
                 logger=False,
                 deterministic=True,
                 auto_lr_find=False,
-                num_sanity_val_steps=0
+                num_sanity_val_steps=0,
+                checkpoint_callback=False,
             )
 
             train_loader, val_loader, test_loader = fold
@@ -153,6 +163,7 @@ def main(
         deterministic=True,
         auto_lr_find=False,
         num_sanity_val_steps=0,
+        checkpoint_callback=False,
         logger=False
     )
     train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], random_state=seed)
@@ -178,6 +189,11 @@ def main(
     with open(results_path / "bayes_opt.txt", "a") as file:
         print('Target label: {}'.format(withdrawn_col))
         print('Maximum AP: {}'.format(1/res.fun), file=file)
+        print('Hidden: {}'.format(res.x[0]), file=file)
+        print('Layers: {}'.format(res.x[1]), file=file)
+        print('Heads: {}'.format(res.x[2]), file=file)
+        print('Bases: {}'.format(res.x[3]), file=file)
+        print('Learning rate: {}'.format(res.x[4], file=file))
         print('Res space: {}'.format(res.space), file=file)
         print('AP on the outer test: {}'.format(test_ap))
         print('AUC on the outer test: {}'.format(test_auc))
