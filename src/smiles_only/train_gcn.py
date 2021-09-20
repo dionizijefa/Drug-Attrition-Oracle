@@ -9,6 +9,11 @@ from EGConv_lightning import Conf, EGConvNet
 from data_func import cross_val, create_loader, calibrate, conformal_prediction
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from sklearn.model_selection import train_test_split
+from torch.utils.data import WeightedRandomSampler
+from torch_geometric.data import DataLoader, Data
+from torch import Tensor, cat
+from data_func import smiles2graph
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -40,10 +45,12 @@ def main(
         bases,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds',
+                                                             'chembl_id']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / test_data)[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds',
+                                                                 'chembl_id']]
     test_loader = create_loader(test_data, withdrawn_col, batch_size)
 
     conf = Conf(
@@ -75,12 +82,12 @@ def main(
 
         model_checkpoint = ModelCheckpoint(
             dirpath=(logger.log_dir + '/checkpoint/'),
-            monitor='val_ap_epoch',
+            monitor='val_auc_epoch',
             mode='max',
             save_top_k=1,
         )
 
-        early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+        early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
                                             min_delta=0.00,
                                             mode='max',
                                             patience=10,
@@ -140,58 +147,82 @@ def main(
     if production:
         conf.save_dir = '{}/production/'.format(root)
         data = pd.concat([data, test_data])
-        approved_calibrations = []
-        withdrawn_calibrations = []
 
-        for count, fold in enumerate(cross_val(data, withdrawn_col, batch_size, seed)):
-            model = EGConvNet(
-                conf.to_hparams(),
-                reduce_lr=conf.reduce_lr,
-            )
+        train, calib = train_test_split(data, test_size=0.15,
+                                       stratify=data[withdrawn_col], shuffle=True,
+                                       random_state=seed)
+        train, val = train_test_split(train, test_size=0.15,
+                                       stratify=train[withdrawn_col], shuffle=True,
+                                       random_state=seed)
 
-            logger = TensorBoardLogger(
-                conf.save_dir,
-                name='egconv_production',
-                version='{}'.format(count),
-            )
+        calib_data_list = []
+        for index, row in calib.iterrows():
+            calib_data_list.append(smiles2graph(row, withdrawn_col))
+        calib_loader = DataLoader(calib_data_list, num_workers=0, batch_size=batch_size)
 
-            model_checkpoint = ModelCheckpoint(
-                dirpath=(logger.log_dir + '/checkpoint/'),
-                monitor='val_ap_epoch',
-                mode='max',
-                save_top_k=1,
-            )
+        val_data_list = []
+        for index, row in val.iterrows():
+            val_data_list.append(smiles2graph(row, withdrawn_col))
+        val_loader = DataLoader(val_data_list, num_workers=0, batch_size=batch_size)
 
-            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
-                                                min_delta=0.00,
-                                                mode='max',
-                                                patience=10,
-                                                verbose=False)
+        train_data_list = []
+        for index, row in train.iterrows():
+            train_data_list.append(smiles2graph(row, withdrawn_col))
 
-            # Copy this script and all files used in training
-            log_dir = Path(logger.log_dir)
-            log_dir.mkdir(exist_ok=True, parents=True)
-            shutil.copy(Path(__file__), log_dir)
+        withdrawn = train[withdrawn_col].value_counts()[1]
+        approved = train[withdrawn_col].value_counts()[0]
+        class_sample_count = [approved, withdrawn]
+        weights = 1 / Tensor(class_sample_count)
+        samples_weights = weights[train[withdrawn_col].values]
+        sampler = WeightedRandomSampler(samples_weights,
+                                        num_samples=len(samples_weights),
+                                        replacement=True)
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
+                                  sampler=sampler)
 
-            print("Starting training")
-            trainer = pl.Trainer(
-                max_epochs=epochs,
-                gpus=[gpu],  # [0]  # load from checkpoint instead of resume
-                weights_summary='top',
-                callbacks=[early_stop_callback, model_checkpoint],
-                deterministic=True,
-                auto_lr_find=False,
-                num_sanity_val_steps=0,
-            )
+        model = EGConvNet(
+            conf.to_hparams(),
+            reduce_lr=conf.reduce_lr,
+        )
 
-            train_loader, val_loader, calib_loader = fold
-            trainer.fit(model, train_loader, val_loader)
-            approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
-            approved_calibrations.append(approved_calibration)
-            withdrawn_calibrations.append(withdrawn_calibration)
+        logger = TensorBoardLogger(
+            conf.save_dir,
+            name='egconv_production',
+            version='production',
+        )
 
-        np.savetxt('approved_calibration.txt', np.array(approved_calibration), delimiter=',')
-        np.savetxt('withdrawn_calibration.txt', np.array(withdrawn_calibration), delimiter=',')
+        model_checkpoint = ModelCheckpoint(
+            dirpath=(logger.log_dir + '/checkpoint/'),
+            monitor='val_ap_epoch',
+            mode='max',
+            save_top_k=1,
+        )
+
+        early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                            min_delta=0.00,
+                                            mode='max',
+                                            patience=10,
+                                            verbose=False)
+
+        # Copy this script and all files used in training
+        log_dir = Path(logger.log_dir)
+        log_dir.mkdir(exist_ok=True, parents=True)
+        shutil.copy(Path(__file__), log_dir)
+
+        print("Starting training")
+        trainer = pl.Trainer(
+            max_epochs=epochs,
+            gpus=[gpu],  # [0]  # load from checkpoint instead of resume
+            weights_summary='top',
+            callbacks=[early_stop_callback, model_checkpoint],
+            deterministic=True,
+            auto_lr_find=False,
+            num_sanity_val_steps=0,
+        )
+        trainer.fit(model, train_loader, val_loader)
+        approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+        np.savetxt(conf.save_dir+'approved_calibration.csv', approved_calibration)
+        np.savetxt(conf.save_dir+'withdrawn_calibration.csv', withdrawn_calibration)
 
 
 if __name__ == '__main__':
