@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from time import time
 import numpy as np
@@ -9,16 +10,16 @@ from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
-from src.data_func import cross_val, create_loader
+from data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
 
 root = Path(__file__).resolve().parents[2].absolute()
-
 
 @click.command()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
+@click.option('-descriptors_from', default=0)
 @click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
