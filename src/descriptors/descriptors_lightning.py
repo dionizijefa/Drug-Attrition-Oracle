@@ -7,7 +7,7 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import auroc, average_precision
-from EGConv import EGConvModel
+from EGConv_descriptors import EGConvDescriptors
 import pytorch_lightning as pl
 
 
@@ -23,14 +23,16 @@ class Conf:
     use_16bit: bool = False
     save_dir = '{}/models/'.format(root)
     lr: float = 1e-4
-    batch_size: int = 16
+    batch_size: int = 32
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
+    pos_weight: torch.Tensor = torch.Tensor([8])
     hidden_channels: int = 1024
     num_layers: int = 4
     num_heads: int = 8
-    num_bases: int = 4
+    num_bases: int = 4,
+
 
     def to_hparams(self) -> Dict:
         excludes = [
@@ -51,22 +53,27 @@ class EGConvNet(pl.LightningModule, ABC):
     def __init__(
             self,
             hparams,
+            descriptors_len,
+            options,
             reduce_lr: Optional[bool] = True,
+
     ):
         super().__init__()
         self.save_hyperparameters(hparams)
         self.reduce_lr = reduce_lr
-        self.model = EGConvModel(
+        self.model = EGConvDescriptors(
             self.hparams.hidden_channels,
             self.hparams.num_layers,
             self.hparams.num_heads,
             self.hparams.num_bases,
-            aggregator=['sum', 'mean', 'max']
+            aggregator=['sum', 'mean', 'max'],
+            descriptors_len=descriptors_len,
+            options=options,
         )
         pl.seed_everything(hparams['seed'])
 
     def forward(self, data):
-        out = self.model(data.x, data.edge_index, data.batch)
+        out = self.model(data.x, data.edge_index, data.batch, data.descriptors)
         return out
 
     def training_step(self, batch, batch_idx):
@@ -125,7 +132,7 @@ class EGConvNet(pl.LightningModule, ABC):
         self.log_dict(log_metrics)
 
     def shared_step(self, data, batchidx):
-        y_hat = self.model(data.x, data.edge_index, data.batch)
+        y_hat = self.model(data.x, data.edge_index, data.batch, data.descriptors)
         pos_weight = self.hparams.pos_weight.to("cuda")
         loss_fn = torch.nn.BCEWithLogitsLoss(
             #pos_weight=pos_weight

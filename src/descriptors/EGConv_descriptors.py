@@ -4,11 +4,13 @@ from torch.nn.init import xavier_uniform_
 from torch import cat
 
 
-class EGConvNet(Module):
+class EGConvDescriptors(Module):
     """Multi aggregators = ['sum', 'mean', 'max'] or
     ['symnorm']"""
-    def __init__(self, descriptors_len, hidden_channels, num_layers, num_heads, num_bases, aggregator):
+
+    def __init__(self, hidden_channels, num_layers, num_heads, num_bases, aggregator, descriptors_len, options):
         super().__init__()
+        self.options = options
 
         self.lin1 = Linear(27, hidden_channels)
         self.norm1 = BatchNorm1d(hidden_channels)
@@ -21,21 +23,88 @@ class EGConvNet(Module):
                        num_heads, num_bases))
             self.norms.append(BatchNorm1d(hidden_channels))
 
-        self.mlp = Sequential(
-            Linear(hidden_channels, hidden_channels // 2, bias=False),
-            BatchNorm1d(hidden_channels // 2),
-            ReLU(inplace=True),
-            Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
-            BatchNorm1d(hidden_channels // 4),
-            ReLU(inplace=True),
-        )
+        if self.options == "hidden_descriptors":
+            self.descriptors_mlp = Sequential(
+                Linear(descriptors_len, hidden_channels, bias=False),
+                BatchNorm1d(hidden_channels),
+                ReLU(inplace=True),
+                Linear(hidden_channels, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+            )
 
-        self.linear_2 = Linear((descriptors_len + hidden_channels // 4), 128)
-        self.batch_norm_1 = BatchNorm1d(128)
-        self.out = Linear(128, 1)
+            self.mlp = Sequential(
+                Linear(hidden_channels, hidden_channels // 2, bias=False),
+                BatchNorm1d(hidden_channels // 2),
+                ReLU(inplace=True),
+                Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+            )
+
+            self.lin2 = Linear((hidden_channels // 2), 128) #concat layer
+            self.bn2 = BatchNorm1d(128)
+            self.act2 = ReLU()
+            self.out = Linear(128, 1)
+
+        if self.options == "concat_descriptors":
+            self.mlp = Sequential(
+                Linear(hidden_channels, hidden_channels // 2, bias=False),
+                BatchNorm1d(hidden_channels // 2),
+                ReLU(inplace=True),
+                Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+            )
+
+            self.lin2 = Linear(descriptors_len+(hidden_channels // 4), 128)
+            self.bn2 = BatchNorm1d(128)
+            self.act2 = ReLU()
+            self.out = Linear(128, 1)
+
+        if self.options == "average_outputs":
+            self.descriptors_mlp = Sequential(
+                Linear(descriptors_len, hidden_channels, bias=False),
+                BatchNorm1d(hidden_channels),
+                ReLU(inplace=True),
+                Linear(hidden_channels, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+            )
+            self.desc_lin = Linear(hidden_channels//4, 1)
+            self.desc_bn = BatchNorm1d(1)
+            self.desc_act = ReLU()
+
+            self.mlp = Sequential(
+                Linear(hidden_channels, hidden_channels // 2, bias=False),
+                BatchNorm1d(hidden_channels // 2),
+                ReLU(inplace=True),
+                Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+            )
+            self.gcn_linear = Linear(hidden_channels // 4, 1)
+            self.gcn_bn = BatchNorm1d(hidden_channels, 1)
+            self.gcn_act = ReLU()
+
+            self.out = Linear(2, 1)
+
+        if self.options == "concat_early":
+            self.mlp = Sequential(
+                Linear(hidden_channels+descriptors_len, hidden_channels, bias=False),
+                BatchNorm1d(hidden_channels),
+                ReLU(inplace=True),
+                Linear(hidden_channels, hidden_channels // 2, bias=False),
+                BatchNorm1d(hidden_channels // 2),
+                ReLU(inplace=True),
+                Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
+                BatchNorm1d(hidden_channels // 4),
+                ReLU(inplace=True),
+                Linear(hidden_channels //4 , 1),
+            )
 
     def forward(self, x, edge_index, batch, descriptors):
-        #x = torch.tensor(x).to(torch.int64) za GNN explainer
+        # x = torch.tensor(x).to(torch.int64) for GNN explainer
         x = self.lin1(x)
         x = self.norm1(x)
         x = x.relu_()
@@ -48,14 +117,35 @@ class EGConvNet(Module):
 
         x = global_mean_pool(x, batch)
 
-        x = self.mlp(x)
-        x = cat((x, descriptors), dim=1)
-        x = self.linear_2(x)
-        x = x.relu_()
-        x = self.batch_norm_1(x)
-        x = self.out(x)
+        if self.options == 'hidden_descriptors':
+            x = self.mlp(x)
+            descriptors = self.descriptors_mlp(descriptors)
+            x = cat((x, descriptors), dim=1)
+            x = self.act2(self.bn2(self.lin2(x)))
 
-        return x
+            return self.out(x)
+
+        if self.options == 'concat_descriptors':
+            x = self.mlp(x)
+            x = cat((x, descriptors), dim=1)
+            x = self.act2(self.bn2(self.lin2(x)))
+
+            return self.out(x)
+
+        if self.options == 'average_outputs':
+            x = self.mlp(x)
+            x = self.gcn_act(self.gcn_bn(self.gcn_linear(x)))
+            descriptors = self.mlp(descriptors)
+            descriptors = self.desc_act(self.desc_bn(self.desc_lin(descriptors)))
+
+            x = cat((x, descriptors), dim=1)
+
+            return self.out(x)
+
+        if self.options == 'concat_early':
+            x = cat((x, descriptors), dim=1)
+
+            return self.mlp(x)
 
 
 

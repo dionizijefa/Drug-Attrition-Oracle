@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 from time import time
 import numpy as np
@@ -9,8 +8,8 @@ from skopt import gp_minimize
 from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 import click
-from EGConv_lightning import Conf, EGConvNet
-from data_func import cross_val, create_loader
+from descriptors_lightning import Conf, EGConvNet
+from src.data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -33,10 +32,10 @@ def main(
         gpu,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))
 
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
@@ -53,6 +52,7 @@ def main(
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
     dim_4 = Integer(1, 8, name='num_bases')
     dim_5 = Real(1e-5, 1e-3, name='lr')
+    dim_6 = Categorical([])
     dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5]
 
     @use_named_args(dimensions=dimensions)
