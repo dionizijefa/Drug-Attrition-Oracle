@@ -1,15 +1,10 @@
 from pathlib import Path
-from time import time
-import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
-from skopt import gp_minimize
-from skopt.space import Categorical, Integer, Real
-from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
-from ..data_func import cross_val, create_loader
+from src.utils.data_func import create_loader
 from pytorch_lightning.callbacks import EarlyStopping
 
 root = Path(__file__).resolve().parents[2].absolute()

@@ -6,7 +6,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import click
 from EGConv_lightning import Conf, EGConvNet
-from ..data_func import cross_val, create_loader, calibrate, conformal_prediction, smiles2graph
+from src.utils.data_func import cross_val, create_loader, calibrate, conformal_prediction, smiles2graph
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split

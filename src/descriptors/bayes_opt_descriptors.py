@@ -9,7 +9,7 @@ from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 import click
 from descriptors_lightning import Conf, EGConvNet
-from src.data_func import cross_val, create_loader
+from src.utils.data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
 
 root = Path(__file__).resolve().parents[2].absolute()
