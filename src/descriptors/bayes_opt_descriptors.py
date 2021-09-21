@@ -1,5 +1,5 @@
 from pathlib import Path
-from time import time
+from time import time, sleep
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -27,6 +27,7 @@ def main(
         train_data,
         test_data,
         withdrawn_col,
+        descriptors_from,
         batch_size,
         epochs,
         gpu,
@@ -44,7 +45,16 @@ def main(
         data = data.dropna(subset=[withdrawn_col])  # some molecules don't share all labels
         test_data = test_data.dropna(subset=[withdrawn_col])
 
-    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size)
+    descriptors_len = len(data.iloc[0][:descriptors_from])
+    print('\n')
+    print('First descriptor: {}'.format(data.iloc[0][:descriptors_from][0]))
+    print('If first descriptor is some other column, abort and enter correct value to prevent information leaks')
+    print('Waiting for 5 seconds, press CTRL + C to abort execution')
+    sleep(5)
+    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors_from=descriptors_from)
+    for i in outer_test_loader:
+        print(i.descriptors)
+        print(error)
 
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
@@ -52,11 +62,11 @@ def main(
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
     dim_4 = Integer(1, 8, name='num_bases')
     dim_5 = Real(1e-5, 1e-3, name='lr')
-    dim_6 = Categorical([])
-    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5]
+    dim_6 = Categorical(["hidden_descriptors", "concat_descriptors", "average_outputs", "concat_early"], name='options')
+    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5, dim_6]
 
     @use_named_args(dimensions=dimensions)
-    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases, lr):
+    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases, lr, options):
         fold_ap = []
         fold_auroc = []
         conf = Conf(
@@ -70,10 +80,12 @@ def main(
             seed=seed,
         )
 
-        for fold in cross_val(data, withdrawn_col, batch_size, seed):
+        for fold in cross_val(data, withdrawn_col, batch_size, seed, descriptors_from=descriptors_from):
             model = EGConvNet(
                 conf.to_hparams(),
                 reduce_lr=conf.reduce_lr,
+                descriptors_len=
+                options=options,
             )
 
             early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
