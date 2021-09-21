@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../..')
 from pathlib import Path
 import pandas as pd
 import pytorch_lightning as pl
