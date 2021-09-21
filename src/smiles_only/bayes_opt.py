@@ -1,13 +1,18 @@
 import sys
 sys.path.append('../..')
+import numpy as np
 from pathlib import Path
 import pandas as pd
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 import click
 from EGConv_lightning import Conf, EGConvNet
-from src.utils.data_func import create_loader
+from src.utils.data_func import create_loader, cross_val
 from pytorch_lightning.callbacks import EarlyStopping
+from skopt import gp_minimize
+from skopt.space import Categorical, Integer, Real
+from skopt.utils import use_named_args
+from time import time
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -35,7 +40,7 @@ def main(
     test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
 
     if withdrawn_col == 'wd_withdrawn':
-        data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
+        data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0)  # withdrawn has only withdrawn mols
         test_data['wd_withdrawn'] = test_data['wd_withdrawn'].fillna(0)
     else:
         data = data.dropna(subset=[withdrawn_col])  # some molecules don't share all labels
@@ -43,7 +48,6 @@ def main(
 
     outer_test_loader = create_loader(test_data, withdrawn_col, batch_size)
 
-    """
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
@@ -126,7 +130,7 @@ def main(
     print('Res space: {}'.format(res.x))
     print('Time elapsed in hrs: {}'.format(elapsed))
     print('\n')
-    
+
     print('Testing the optimized model on the test set')
 
     conf = Conf(
@@ -137,17 +141,6 @@ def main(
         num_heads=res.x[2],
         num_bases=res.x[3],
         lr=res.x[4],
-        seed=seed
-    )
-    """
-    conf = Conf(
-        batch_size=batch_size,
-        reduce_lr=True,
-        hidden_channels=1024,
-        num_layers=4,
-        num_heads=4,
-        num_bases=3,
-        lr=0.000169,
         seed=seed
     )
 
@@ -188,7 +181,7 @@ def main(
     print('AUC of the outer test set with optimized parameters: {}'.format(test_auc))
 
     results_path = Path(root / 'bayes_opt')
-    """
+
     if not results_path.exists():
         results_path.mkdir(exist_ok=True, parents=True)
         with open(results_path / "bayes_opt.txt", "w") as file:
@@ -197,7 +190,7 @@ def main(
 
     with open(results_path / "bayes_opt.txt", "a") as file:
         print('Target label: {}'.format(withdrawn_col))
-        print('Maximum AP: {}'.format(1/res.fun), file=file)
+        print('Maximum AP: {}'.format(1 / res.fun), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)
@@ -208,7 +201,7 @@ def main(
         print('AUC on the outer test: {}'.format(test_auc))
         file.write("\n")
         file.write("\n")
-    """
+
 
 if __name__ == '__main__':
     main()

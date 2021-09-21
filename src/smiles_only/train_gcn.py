@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../..')
 import shutil
 from pathlib import Path
 from time import time
