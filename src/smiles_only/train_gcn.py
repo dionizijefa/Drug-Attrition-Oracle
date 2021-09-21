@@ -6,14 +6,13 @@ import pandas as pd
 import pytorch_lightning as pl
 import click
 from EGConv_lightning import Conf, EGConvNet
-from src.data_func import cross_val, create_loader, calibrate, conformal_prediction
+from ..data_func import cross_val, create_loader, calibrate, conformal_prediction, smiles2graph
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader
 from torch import Tensor
-from src.data_func import smiles2graph
 
 root = Path(__file__).resolve().parents[2].absolute()
 

@@ -9,7 +9,7 @@ from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 import click
 from EGConv_lightning import Conf, EGConvNet
-from src.data_func import cross_val, create_loader
+from ..data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -46,7 +46,7 @@ def main(
 
     outer_test_loader = create_loader(test_data, withdrawn_col, batch_size)
 
-
+    """
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
@@ -129,7 +129,7 @@ def main(
     print('Res space: {}'.format(res.x))
     print('Time elapsed in hrs: {}'.format(elapsed))
     print('\n')
-
+    
     print('Testing the optimized model on the test set')
 
     conf = Conf(
@@ -140,6 +140,17 @@ def main(
         num_heads=res.x[2],
         num_bases=res.x[3],
         lr=res.x[4],
+        seed=seed
+    )
+    """
+    conf = Conf(
+        batch_size=batch_size,
+        reduce_lr=True,
+        hidden_channels=1024,
+        num_layers=4,
+        num_heads=4,
+        num_bases=3,
+        lr=0.000169,
         seed=seed
     )
 
@@ -180,6 +191,7 @@ def main(
     print('AUC of the outer test set with optimized parameters: {}'.format(test_auc))
 
     results_path = Path(root / 'bayes_opt')
+    """
     if not results_path.exists():
         results_path.mkdir(exist_ok=True, parents=True)
         with open(results_path / "bayes_opt.txt", "w") as file:
@@ -199,6 +211,7 @@ def main(
         print('AUC on the outer test: {}'.format(test_auc))
         file.write("\n")
         file.write("\n")
+    """
 
 if __name__ == '__main__':
     main()
