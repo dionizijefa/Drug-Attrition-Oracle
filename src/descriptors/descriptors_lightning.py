@@ -27,11 +27,10 @@ class Conf:
     epochs: int = 300
     ckpt_path: Optional[str] = None
     reduce_lr: Optional[bool] = False
-    pos_weight: torch.Tensor = torch.Tensor([8])
     hidden_channels: int = 1024
     num_layers: int = 4
     num_heads: int = 8
-    num_bases: int = 4,
+    num_bases: int = 4
 
 
     def to_hparams(self) -> Dict:
@@ -133,10 +132,7 @@ class EGConvNet(pl.LightningModule, ABC):
 
     def shared_step(self, data, batchidx):
         y_hat = self.model(data.x, data.edge_index, data.batch, data.descriptors)
-        pos_weight = self.hparams.pos_weight.to("cuda")
-        loss_fn = torch.nn.BCEWithLogitsLoss(
-            #pos_weight=pos_weight
-        )
+        loss_fn = torch.nn.BCEWithLogitsLoss()
         loss = loss_fn(y_hat, data.y.unsqueeze(-1))
 
         return {

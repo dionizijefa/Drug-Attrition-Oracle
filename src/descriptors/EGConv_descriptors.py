@@ -70,10 +70,10 @@ class EGConvDescriptors(Module):
                 Linear(hidden_channels, hidden_channels // 4, bias=False),
                 BatchNorm1d(hidden_channels // 4),
                 ReLU(inplace=True),
+                Linear(hidden_channels // 4, 1),
+                BatchNorm1d(1),
+                ReLU(inplace=True)
             )
-            self.desc_lin = Linear(hidden_channels//4, 1)
-            self.desc_bn = BatchNorm1d(1)
-            self.desc_act = ReLU()
 
             self.mlp = Sequential(
                 Linear(hidden_channels, hidden_channels // 2, bias=False),
@@ -82,10 +82,10 @@ class EGConvDescriptors(Module):
                 Linear(hidden_channels // 2, hidden_channels // 4, bias=False),
                 BatchNorm1d(hidden_channels // 4),
                 ReLU(inplace=True),
+                Linear(hidden_channels // 4, 1),
+                BatchNorm1d(1),
+                ReLU(inplace=True),
             )
-            self.gcn_linear = Linear(hidden_channels // 4, 1)
-            self.gcn_bn = BatchNorm1d(hidden_channels, 1)
-            self.gcn_act = ReLU()
 
             self.out = Linear(2, 1)
 
@@ -134,9 +134,7 @@ class EGConvDescriptors(Module):
 
         if self.options == 'average_outputs':
             x = self.mlp(x)
-            x = self.gcn_act(self.gcn_bn(self.gcn_linear(x)))
-            descriptors = self.mlp(descriptors)
-            descriptors = self.desc_act(self.desc_bn(self.desc_lin(descriptors)))
+            descriptors = self.descriptors_mlp(descriptors)
 
             x = cat((x, descriptors), dim=1)
 

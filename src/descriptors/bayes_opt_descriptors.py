@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../..")
 from pathlib import Path
 from time import time, sleep
 import numpy as np
@@ -33,10 +35,10 @@ def main(
         gpu,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))
+    data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data))
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)
 
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
@@ -45,17 +47,13 @@ def main(
         data = data.dropna(subset=[withdrawn_col])  # some molecules don't share all labels
         test_data = test_data.dropna(subset=[withdrawn_col])
 
-    descriptors_len = len(data.iloc[0][:descriptors_from])
+    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors_from=descriptors_from)
+    descriptors_len = len(data.iloc[0][descriptors_from:])
     print('\n')
-    print('First descriptor: {}'.format(data.iloc[0][:descriptors_from][0]))
+    print('First descriptor: {}'.format(data.iloc[0].iloc[descriptors_from:]))
     print('If first descriptor is some other column, abort and enter correct value to prevent information leaks')
     print('Waiting for 5 seconds, press CTRL + C to abort execution')
     sleep(5)
-    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors_from=descriptors_from)
-    for i in outer_test_loader:
-        print(i.descriptors)
-        print(error)
-
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
@@ -84,7 +82,7 @@ def main(
             model = EGConvNet(
                 conf.to_hparams(),
                 reduce_lr=conf.reduce_lr,
-                descriptors_len=
+                descriptors_len=descriptors_len,
                 options=options,
             )
 
@@ -142,7 +140,6 @@ def main(
     print('Res space: {}'.format(res.x))
     print('Time elapsed in hrs: {}'.format(elapsed))
     print('\n')
-
     print('Testing the optimized model on the test set')
 
     conf = Conf(
@@ -158,6 +155,8 @@ def main(
 
     model = EGConvNet(
         conf.to_hparams(),
+        descriptors_len=descriptors_len,
+        options=res.x[5],
         reduce_lr=conf.reduce_lr,
     )
 
@@ -180,8 +179,8 @@ def main(
         logger=False
     )
     train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], random_state=seed)
-    train_loader = create_loader(train, withdrawn_col, batch_size)
-    val_loader = create_loader(val, withdrawn_col, batch_size)
+    train_loader = create_loader(train, withdrawn_col, batch_size, descriptors_from=descriptors_from)
+    val_loader = create_loader(val, withdrawn_col, batch_size, descriptors_from=descriptors_from)
 
     trainer.fit(model, train_loader, val_loader)
     results = trainer.test(model, outer_test_loader)
@@ -195,12 +194,13 @@ def main(
     results_path = Path(root / 'bayes_opt')
     if not results_path.exists():
         results_path.mkdir(exist_ok=True, parents=True)
-        with open(results_path / "bayes_opt.txt", "w") as file:
-            file.write("Bayes opt - EGConv")
+        with open(results_path / "bayes_opt_descriptors.txt", "w") as file:
+            file.write("Bayes opt - EGConv + Descriptors")
             file.write("\n")
 
-    with open(results_path / "bayes_opt.txt", "a") as file:
+    with open(results_path / "bayes_opt_descriptors.txt", "a") as file:
         print('Target label: {}'.format(withdrawn_col))
+        print('Option: {}'.format(res.x[5]))
         print('Maximum AP: {}'.format(1/res.fun), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)

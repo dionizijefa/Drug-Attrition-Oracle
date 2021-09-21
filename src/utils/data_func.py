@@ -154,7 +154,7 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     y = data[withdrawn_col]
     smiles = data['standardized_smiles']
     if 'descriptors_from' in kwargs:
-        descriptors = data.iloc[:kwargs['descriptors_from']].values
+        descriptors = data.iloc[kwargs['descriptors_from']:].values
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms
@@ -260,8 +260,9 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     graph['feature_names'] = names
 
     if 'descriptors_from' in kwargs:
+        graph['descriptors'] = Tensor([descriptors.astype(float)])
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
-                    descriptors=descriptors)
+                    descriptors=graph['descriptors'])
     else:
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names)
 
