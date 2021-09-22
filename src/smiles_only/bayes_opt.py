@@ -120,8 +120,8 @@ def main(
     res = gp_minimize(inverse_ap,  # minimize the inverse of average precision
                       dimensions=dimensions,  # hyperparams
                       acq_func="EI",  # the acquisition function
-                      n_calls=30,  # the number of evaluations of f
-                      n_random_starts=5,  # the number of random initialization points
+                      n_calls=40,  # the number of evaluations of f
+                      n_random_starts=10,  # the number of random initialization points
                       random_state=seed)  # the random seed
     end = time()
     elapsed = (end - start) / 3600
@@ -190,7 +190,6 @@ def main(
 
     with open(results_path / "bayes_opt.txt", "a") as file:
         print('Target label: {}'.format(withdrawn_col))
-        print('Maximum AP: {}'.format(1 / res.fun), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)

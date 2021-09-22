@@ -71,7 +71,6 @@ class EGConvDescriptors(Module):
                 BatchNorm1d(hidden_channels // 4),
                 ReLU(inplace=True),
                 Linear(hidden_channels // 4, 1),
-                BatchNorm1d(1),
                 ReLU(inplace=True)
             )
 
@@ -83,7 +82,6 @@ class EGConvDescriptors(Module):
                 BatchNorm1d(hidden_channels // 4),
                 ReLU(inplace=True),
                 Linear(hidden_channels // 4, 1),
-                BatchNorm1d(1),
                 ReLU(inplace=True),
             )
 

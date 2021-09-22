@@ -36,10 +36,10 @@ def main(
         gpu,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)[['chembl_id', withdrawn_col, 'scaffolds']]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['chembl_id', withdrawn_col, 'standardized_smiles']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)[['chembl_id', withdrawn_col, 'scaffolds']]
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['chembl_id', withdrawn_col, 'standardized_smiles']]
 
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
@@ -49,15 +49,15 @@ def main(
         test_data = test_data.dropna(subset=[withdrawn_col])
 
     if descriptors == 'alvadesc':
-        descriptors = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
         descriptors_len = alvadesc_descriptors_len
 
     else:
-        descriptors = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         descriptors_len = rdkit_descriptors_len
 
-    data = data.merge(descriptors, how='inner', on='chembl_id')
-    test_data = test_data.merge(descriptors, how='inner', on='chembl_id')
+    data = data.merge(descriptors_df, how='inner', on='chembl_id')
+    test_data = test_data.merge(descriptors_df, how='inner', on='chembl_id')
     outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors=descriptors)
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')

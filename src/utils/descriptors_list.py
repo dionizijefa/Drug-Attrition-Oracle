@@ -1,7 +1,7 @@
 """ Have to sort the descriptors according to this order for NN weights """
 
 rdkit_descriptors_len = 196
-alvadesc_descriptors_len = 261
+alvadesc_descriptors_len = 260
 
 rdkit_descriptors = [
  'BalabanJ',
@@ -203,7 +203,6 @@ rdkit_descriptors = [
 ]
 
 alvadesc_descriptors = [
- 'chembl_id',
  'QED',
  'Eig13_EA(bo)',
  'Eig15_EA(bo)',

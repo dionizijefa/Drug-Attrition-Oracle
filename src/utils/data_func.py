@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../..")
 from pathlib import Path
 import numpy as np
 from rdkit import RDConfig, Chem
@@ -7,7 +9,7 @@ import pandas as pd
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
 from torch import Tensor, cat
-from descriptors_list import rdkit_descriptors, alvadesc_descriptors
+from src.utils.descriptors_list import rdkit_descriptors, alvadesc_descriptors
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
 factory = ChemicalFeatures.BuildFeatureFactory(str(fdef_name))
@@ -157,9 +159,9 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     if 'descriptors' in kwargs:
         descriptors = data
         if kwargs['descriptors'] == 'alvadesc':
-            descriptors = descriptors[[alvadesc_descriptors]]  # keep only descriptors from the list
+            descriptors = descriptors[alvadesc_descriptors]  # keep only descriptors from the list
         else:
-            descriptors = descriptors[[rdkit_descriptors]]
+            descriptors = descriptors[rdkit_descriptors]
 
     mol = Chem.MolFromSmiles(smiles)
 
