@@ -34,14 +34,10 @@ def main(
         gpu,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds',
-                                                             'drugbank_three_class']]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
-    data = data.loc[data['drugbank_three_class'] != 'DISCONT']
 
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds',
-                                                                 'drugbank_three_class']]
-    test_data = test_data.loc[test_data['drugbank_three_class'] != 'DISCONT']
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'scaffolds']]
 
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0)  # withdrawn has only withdrawn mols
