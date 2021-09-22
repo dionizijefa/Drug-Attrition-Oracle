@@ -13,7 +13,8 @@ import click
 from descriptors_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
-from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len
+from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len
+from src.utils.descriptors_list import toxprint_descriptors_10pct_len
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -51,6 +52,14 @@ def main(
     if descriptors == 'alvadesc':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
         descriptors_len = alvadesc_descriptors_len
+
+    elif descriptors == 'padel1560':
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        descriptors_len = padel_descriptors_10pct_len
+
+    elif descriptors == 'toxprint':
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        descriptors_len = toxprint_descriptors_10pct_len
 
     else:
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
@@ -204,9 +213,9 @@ def main(
             file.write("\n")
 
     with open(results_path / "bayes_opt_descriptors.txt", "a") as file:
-        print('Target label: {}'.format(withdrawn_col))
-        print('Option: {}'.format(res.x[5]))
-        print('Maximum AP: {}'.format(1/res.fun), file=file)
+        print('Target label: {}'.format(withdrawn_col), file=file)
+        print('Option: {}'.format(res.x[5]), file=file)
+        print('Descriptors: {}'.format(descriptors), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)

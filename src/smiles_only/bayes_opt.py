@@ -189,15 +189,15 @@ def main(
             file.write("\n")
 
     with open(results_path / "bayes_opt.txt", "a") as file:
-        print('Target label: {}'.format(withdrawn_col))
+        print('Target label: {}'.format(withdrawn_col), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)
         print('Bases: {}'.format(res.x[3]), file=file)
         print('Learning rate: {}'.format(res.x[4], file=file))
         print('Res space: {}'.format(res.space), file=file)
-        print('AP on the outer test: {}'.format(test_ap))
-        print('AUC on the outer test: {}'.format(test_auc))
+        print('AP on the outer test: {}'.format(test_ap), file=file)
+        print('AUC on the outer test: {}'.format(test_auc), file=file)
         file.write("\n")
         file.write("\n")
 

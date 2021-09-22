@@ -1,9 +1,9 @@
 """ Have to sort the descriptors according to this order for NN weights """
 
-padel_descriptors_10pct_len = 225  # only those columns whose sum is greater than class balance (250), drops mostly 0 cols
+padel_descriptors_10pct_len = 225  # only those columns whose sum is greater than class balance (250), drops mostly 0
 rdkit_descriptors_len = 196
 alvadesc_descriptors_len = 260
-toxprint_descriptors_10pct_len = 57 # same as padel
+toxprint_descriptors_10pct_len = 57  # same as padel
 
 rdkit_descriptors = [
  'BalabanJ',
@@ -754,5 +754,6 @@ toxprint_descriptors_10pct = [
  'ring:hetero_[6]_Z_generic',
  'ring:hetero_[6_6]_Z_generic'
 ]
+
 
 
