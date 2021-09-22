@@ -1,5 +1,8 @@
 """ Have to sort the descriptors according to this order for NN weights """
 
+rdkit_descriptors_len = 196
+alvadesc_descriptors_len = 261
+
 rdkit_descriptors = [
  'BalabanJ',
  'BertzCT',

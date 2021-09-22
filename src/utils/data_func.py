@@ -7,6 +7,7 @@ import pandas as pd
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
 from torch import Tensor, cat
+from descriptors_list import rdkit_descriptors, alvadesc_descriptors
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
 factory = ChemicalFeatures.BuildFeatureFactory(str(fdef_name))
@@ -153,8 +154,13 @@ def smiles2graph(data, withdrawn_col, **kwargs):
 
     y = data[withdrawn_col]
     smiles = data['standardized_smiles']
-    if 'descriptors_from' in kwargs:
-        descriptors = data.iloc[kwargs['descriptors_from']:].values
+    if 'descriptors' in kwargs:
+        descriptors = data
+        if kwargs['descriptors'] == 'alvadesc':
+            descriptors = descriptors[[alvadesc_descriptors]]  # keep only descriptors from the list
+        else:
+            descriptors = descriptors[[rdkit_descriptors]]
+
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms
@@ -259,7 +265,7 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     graph['y'] = Tensor([y])
     graph['feature_names'] = names
 
-    if 'descriptors_from' in kwargs:
+    if 'descriptors' in kwargs:
         graph['descriptors'] = Tensor([descriptors.astype(float)])
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
                     descriptors=graph['descriptors'])

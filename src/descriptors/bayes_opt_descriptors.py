@@ -13,6 +13,7 @@ import click
 from descriptors_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader
 from pytorch_lightning.callbacks import EarlyStopping
+from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -20,7 +21,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-descriptors_from', default=0)
+@click.option('-descriptors', default='rdkit')
 @click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
@@ -29,16 +30,16 @@ def main(
         train_data,
         test_data,
         withdrawn_col,
-        descriptors_from,
+        descriptors,
         batch_size,
         epochs,
         gpu,
         seed,
 ):
-    data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
+    data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)[['chembl_id', withdrawn_col, 'scaffolds']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
 
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)[['chembl_id', withdrawn_col, 'scaffolds']]
 
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0) # withdrawn has only withdrawn mols
@@ -47,13 +48,17 @@ def main(
         data = data.dropna(subset=[withdrawn_col])  # some molecules don't share all labels
         test_data = test_data.dropna(subset=[withdrawn_col])
 
-    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors_from=descriptors_from)
-    descriptors_len = len(data.iloc[0][descriptors_from:])
-    print('\n')
-    print('First descriptor: {}'.format(data.iloc[0].iloc[descriptors_from:]))
-    print('If first descriptor is some other column, abort and enter correct value to prevent information leaks')
-    print('Waiting for 5 seconds, press CTRL + C to abort execution')
-    sleep(5)
+    if descriptors == 'alvadesc':
+        descriptors = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
+        descriptors_len = alvadesc_descriptors_len
+
+    else:
+        descriptors = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
+        descriptors_len = rdkit_descriptors_len
+
+    data = data.merge(descriptors, how='inner', on='chembl_id')
+    test_data = test_data.merge(descriptors, how='inner', on='chembl_id')
+    outer_test_loader = create_loader(test_data, withdrawn_col, batch_size, descriptors=descriptors)
 
     dim_1 = Categorical([128, 256, 512, 1024, 2048], name='hidden_channels')
     dim_2 = Integer(1, 8, name='num_layers')
@@ -78,7 +83,7 @@ def main(
             seed=seed,
         )
 
-        for fold in cross_val(data, withdrawn_col, batch_size, seed, descriptors_from=descriptors_from):
+        for fold in cross_val(data, withdrawn_col, batch_size, seed, descriptors=descriptors):
             model = EGConvNet(
                 conf.to_hparams(),
                 reduce_lr=conf.reduce_lr,
@@ -179,8 +184,8 @@ def main(
         logger=False
     )
     train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], random_state=seed)
-    train_loader = create_loader(train, withdrawn_col, batch_size, descriptors_from=descriptors_from)
-    val_loader = create_loader(val, withdrawn_col, batch_size, descriptors_from=descriptors_from)
+    train_loader = create_loader(train, withdrawn_col, batch_size, descriptors=descriptors)
+    val_loader = create_loader(val, withdrawn_col, batch_size, descriptors=descriptors)
 
     trainer.fit(model, train_loader, val_loader)
     results = trainer.test(model, outer_test_loader)
