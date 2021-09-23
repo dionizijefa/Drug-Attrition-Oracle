@@ -27,10 +27,10 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
 @click.option('-production', default=False)
-@click.option('-hidden', default=1024)
-@click.option('-layers', default=4)
+@click.option('-hidden', default=256)
+@click.option('-layers', default=3)
 @click.option('-heads', default=4)
-@click.option('-bases', default=3)
+@click.option('-bases', default=7)
 @click.option('-seed', default=0)
 def main(
         train_data,
@@ -108,6 +108,7 @@ def main(
             deterministic=True,
             auto_lr_find=False,
             num_sanity_val_steps=0,
+            logger=logger,
         )
 
         train_loader, val_loader, calib_loader = fold
@@ -123,11 +124,12 @@ def main(
         )
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
+        cross_probabilities.append(test_probabilities)
 
 
         mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
         mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
-        mean_probabilities = np.median(np.array(cross_probabilities), axis=0)
+        mean_probabilities = np.mean(np.array(cross_probabilities), axis=0)
 
         conformal_output = test_data[["chembl_id", withdrawn_col]]
         conformal_output['p_approved'] = mean_p_approved
