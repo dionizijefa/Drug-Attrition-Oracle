@@ -173,7 +173,7 @@ def main(
         samples_weights = weights[train[withdrawn_col].values]
         sampler = WeightedRandomSampler(samples_weights,
                                         num_samples=len(samples_weights),
-                                        replacement=False)
+                                        replacement=True)
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
                                   sampler=sampler)
 

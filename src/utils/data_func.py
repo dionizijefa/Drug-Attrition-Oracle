@@ -58,7 +58,7 @@ def cross_val(data, withdrawn_col, batch_size, seed, n_splits=5, **kwargs):
                                         num_samples=len(samples_weights),
                                         replacement=True)
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
-                                  sampler=sampler, replacement=False)
+                                  sampler=sampler)
 
         val_data_list = []
         for index, row in val.iterrows():

@@ -1,4 +1,9 @@
 import sys
+
+from torch import Tensor
+from torch.utils.data import WeightedRandomSampler
+from torch_geometric.data import DataLoader
+
 sys.path.append('../..')
 import numpy as np
 from pathlib import Path
@@ -7,7 +12,7 @@ import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split
 import click
 from EGConv_lightning import Conf, EGConvNet
-from src.utils.data_func import create_loader, cross_val
+from src.utils.data_func import create_loader, cross_val, smiles2graph
 from pytorch_lightning.callbacks import EarlyStopping
 from skopt import gp_minimize
 from skopt.space import Categorical, Integer, Real
@@ -168,7 +173,20 @@ def main(
         logger=False
     )
     train, val = train_test_split(data, test_size=0.15, stratify=data[withdrawn_col], random_state=seed)
-    train_loader = create_loader(train, withdrawn_col, batch_size)
+    withdrawn = train[withdrawn_col].value_counts()[1]
+    approved = train[withdrawn_col].value_counts()[0]
+    class_sample_count = [approved, withdrawn]
+    weights = 1 / Tensor(class_sample_count)
+    samples_weights = weights[train[withdrawn_col].values]
+    sampler = WeightedRandomSampler(samples_weights,
+                                    num_samples=len(samples_weights),
+                                    replacement=True)
+    train_data_list = []
+    for index, row in train.iterrows():
+        train_data_list.append(smiles2graph(row, withdrawn_col))
+
+    train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
+                              sampler=sampler)
     val_loader = create_loader(val, withdrawn_col, batch_size)
 
     trainer.fit(model, train_loader, val_loader)
