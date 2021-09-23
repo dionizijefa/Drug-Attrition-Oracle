@@ -1,4 +1,7 @@
 import sys
+
+from src.utils.metrics import table_metrics
+
 sys.path.append('../..')
 import shutil
 from pathlib import Path
@@ -142,6 +145,8 @@ def main(
 
 
         conformal_output.to_csv(results_path / 'test_set_conformal.csv')
+        results = table_metrics(conformal_output, withdrawn_col)
+        results.to_csv(results_path / 'test_set_conformal.csv')
 
     if production:
         conf.save_dir = '{}/production/'.format(root)
