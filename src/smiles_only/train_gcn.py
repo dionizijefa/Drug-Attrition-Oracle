@@ -69,7 +69,7 @@ def main(
     cross_withdrawn_p = []
     cross_probabilities = []
 
-    for fold in cross_val(data, withdrawn_col, batch_size, seed):
+    for fold in cross_val(data, withdrawn_col, batch_size, seed, n_splits=6,):
         model = EGConvNet(
             conf.to_hparams(),
             reduce_lr=conf.reduce_lr,
@@ -124,24 +124,20 @@ def main(
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
 
-        median_p_approved = np.median(np.array(cross_approved_p), axis=0)
-        median_p_withdrawn = np.median(np.array(cross_withdrawn_p), axis=0)
+
         mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
         mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
-        median_probabilities = np.median(np.array(cross_probabilities), axis=0)
         mean_probabilities = np.median(np.array(cross_probabilities), axis=0)
 
         conformal_output = test_data[["chembl_id", withdrawn_col]]
-        conformal_output['median_p_approved'] = median_p_approved
-        conformal_output['median_p_withdrawn'] = median_p_withdrawn
-        conformal_output['mean_p_approved'] = mean_p_approved
-        conformal_output['mean_p_withdrawn'] = mean_p_withdrawn
-        conformal_output['median_probabilities'] = median_probabilities
-        conformal_output['mean_probabilities'] = mean_probabilities
+        conformal_output['p_approved'] = mean_p_approved
+        conformal_output['p_withdrawn'] = mean_p_withdrawn
+        conformal_output['probabilities'] = mean_probabilities
 
         results_path = Path(root / 'cross_conformal')
         if not results_path.exists():
             results_path.mkdir(exist_ok=True, parents=True)
+
 
         conformal_output.to_csv(results_path / 'test_set_conformal.csv')
 
@@ -177,7 +173,7 @@ def main(
         samples_weights = weights[train[withdrawn_col].values]
         sampler = WeightedRandomSampler(samples_weights,
                                         num_samples=len(samples_weights),
-                                        replacement=True)
+                                        replacement=False)
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
                                   sampler=sampler)
 

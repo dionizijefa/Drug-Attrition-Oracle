@@ -16,10 +16,10 @@ fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
 factory = ChemicalFeatures.BuildFeatureFactory(str(fdef_name))
 
 
-def cross_val(data, withdrawn_col, batch_size, seed, **kwargs):
+def cross_val(data, withdrawn_col, batch_size, seed, n_splits=5, **kwargs):
     """Don't split rest of the splits on scaffolds"""
     cv_splitter = StratifiedKFold(
-        n_splits=5,
+        n_splits=n_splits,
         shuffle=True,
         random_state=seed,
     )
@@ -58,7 +58,7 @@ def cross_val(data, withdrawn_col, batch_size, seed, **kwargs):
                                         num_samples=len(samples_weights),
                                         replacement=True)
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
-                                  sampler=sampler)
+                                  sampler=sampler, replacement=False)
 
         val_data_list = []
         for index, row in val.iterrows():
