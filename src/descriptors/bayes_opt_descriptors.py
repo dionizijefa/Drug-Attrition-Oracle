@@ -79,9 +79,7 @@ def main(
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
     dim_4 = Integer(1, 8, name='num_bases')
     dim_5 = Real(1e-5, 1e-3, name='lr')
-    dim_6 = Categorical(["hidden_descriptors", "concat_descriptors",
-                        # "average_outputs", not working
-                         "concat_early"], name='options')
+    dim_6 = Categorical(["hidden_descriptors", "concat_descriptors", "average_outputs", "concat_early"], name='options')
     dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5, dim_6]
 
     @use_named_args(dimensions=dimensions)
@@ -243,8 +241,8 @@ def main(
         print('Bases: {}'.format(res.x[3]), file=file)
         print('Learning rate: {}'.format(res.x[4], file=file))
         print('Res space: {}'.format(res.space), file=file)
-        print('AP on the outer test: {}'.format(test_ap))
-        print('AUC on the outer test: {}'.format(test_auc))
+        print('AP on the outer test: {}'.format(test_ap), file=file)
+        print('AUC on the outer test: {}'.format(test_auc), file=file)
         file.write("\n")
         file.write("\n")
 
