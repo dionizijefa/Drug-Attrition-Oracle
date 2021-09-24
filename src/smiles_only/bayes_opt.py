@@ -81,7 +81,7 @@ def main(
                 reduce_lr=conf.reduce_lr,
             )
 
-            early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
+            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                                 min_delta=0.00,
                                                 mode='max',
                                                 patience=10,
@@ -118,7 +118,7 @@ def main(
         for i, result in enumerate(fold_auroc):
             print('AUC for fold {}= {}'.format(i, result))
 
-        return 1 / np.mean(fold_auroc)
+        return 1 / np.mean(fold_ap)
 
     print('Starting Bayesian optimization')
     start = time()
@@ -154,7 +154,7 @@ def main(
         reduce_lr=conf.reduce_lr,
     )
 
-    early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
+    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                         min_delta=0.00,
                                         mode='max',
                                         patience=10,

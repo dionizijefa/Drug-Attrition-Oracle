@@ -160,7 +160,7 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     if 'descriptors' in kwargs:
         descriptors = data
         if kwargs['descriptors'] == 'alvadesc':
-            descriptors = descriptors[alvadesc_descriptors]  # keep only descriptors from the list
+            descriptors = descriptors[alvadesc_descriptors].iloc[:100]  # keep only descriptors from the list
         elif kwargs['descriptors'] == 'padel1560':
             descriptors = descriptors[padel_descriptors_10pct]
         elif kwargs['descriptors'] == 'toxprint':

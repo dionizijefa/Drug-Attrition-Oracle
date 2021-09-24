@@ -56,7 +56,8 @@ def main(
 
     if descriptors == 'alvadesc':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
-        descriptors_len = alvadesc_descriptors_len
+        #descriptors_len = alvadesc_descriptors_len
+        descriptors_len = 100
 
     elif descriptors == 'padel1560':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
@@ -79,11 +80,15 @@ def main(
     dim_3 = Categorical([2, 4, 8, 16], name='num_heads')
     dim_4 = Integer(1, 8, name='num_bases')
     dim_5 = Real(1e-5, 1e-3, name='lr')
-    dim_6 = Categorical(["hidden_descriptors", "concat_descriptors", "average_outputs", "concat_early"], name='options')
-    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5, dim_6]
+    #dim_6 = Categorical(["hidden_descriptors", "concat_descriptors", "average_outputs", "concat_early"], name='options')
+    dimensions = [dim_1, dim_2, dim_3, dim_4, dim_5,
+                  #dim_6
+                  ]
 
     @use_named_args(dimensions=dimensions)
-    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases, lr, options):
+    def inverse_ap(hidden_channels, num_layers, num_heads, num_bases, lr,
+        #options
+    ):
         fold_ap = []
         fold_auroc = []
         conf = Conf(
@@ -102,10 +107,10 @@ def main(
                 conf.to_hparams(),
                 reduce_lr=conf.reduce_lr,
                 descriptors_len=descriptors_len,
-                options=options,
+                options='concat_early',
             )
 
-            early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
+            early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                                 min_delta=0.00,
                                                 mode='max',
                                                 patience=10,
@@ -142,7 +147,7 @@ def main(
         for i, result in enumerate(fold_auroc):
             print('AUC for fold {}= {}'.format(i, result))
 
-        return 1 / np.mean(fold_auroc)
+        return 1 / np.mean(fold_ap)
 
     print('Starting Bayesian optimization')
     start = time()
@@ -175,11 +180,11 @@ def main(
     model = EGConvNet(
         conf.to_hparams(),
         descriptors_len=descriptors_len,
-        options=res.x[5],
+        options='concat_early',
         reduce_lr=conf.reduce_lr,
     )
 
-    early_stop_callback = EarlyStopping(monitor='val_auc_epoch',
+    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
                                         min_delta=0.00,
                                         mode='max',
                                         patience=10,
@@ -233,7 +238,8 @@ def main(
 
     with open(results_path / "bayes_opt_descriptors.txt", "a") as file:
         print('Target label: {}'.format(withdrawn_col), file=file)
-        print('Option: {}'.format(res.x[5]), file=file)
+        #print('Option: {}'.format(res.x[5]), file=file)
+        print('Option: {}'.format('concat_early'), file=file)
         print('Descriptors: {}'.format(descriptors), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
