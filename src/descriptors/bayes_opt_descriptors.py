@@ -63,7 +63,7 @@ def main(
         descriptors_len = padel_descriptors_10pct_len
 
     elif descriptors == 'toxprint':
-        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
         descriptors_len = toxprint_descriptors_10pct_len
 
     else:

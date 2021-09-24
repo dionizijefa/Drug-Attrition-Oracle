@@ -1,7 +1,4 @@
 import sys
-
-from src.utils.metrics import table_metrics
-
 sys.path.append('../..')
 import shutil
 from pathlib import Path
@@ -12,6 +9,7 @@ import pytorch_lightning as pl
 import click
 from EGConv_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader, calibrate, conformal_prediction, smiles2graph
+from src.utils.metrics import table_metrics
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
@@ -72,7 +70,7 @@ def main(
     cross_withdrawn_p = []
     cross_probabilities = []
 
-    for fold in cross_val(data, withdrawn_col, batch_size, seed, n_splits=6,):
+    for fold in cross_val(data, withdrawn_col, batch_size, seed, n_splits=6):
         model = EGConvNet(
             conf.to_hparams(),
             reduce_lr=conf.reduce_lr,
@@ -144,9 +142,9 @@ def main(
             results_path.mkdir(exist_ok=True, parents=True)
 
 
-        conformal_output.to_csv(results_path / 'test_set_conformal.csv')
+        conformal_output.to_csv(results_path / 'test_set_outputs.csv')
         results = table_metrics(conformal_output, withdrawn_col)
-        results.to_csv(results_path / 'test_set_conformal.csv')
+        results.to_csv(results_path / 'results.csv')
 
     if production:
         conf.save_dir = '{}/production/'.format(root)

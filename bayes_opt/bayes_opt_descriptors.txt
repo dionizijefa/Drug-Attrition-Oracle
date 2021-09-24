@@ -30,3 +30,54 @@ AP on the outer test: 0.246
 AUC on the outer test: 0.737
 
 
+Target label: wd_consensus_1
+Option: concat_descriptors
+Descriptors: rdkit
+Hidden: 128
+Layers: 1
+Heads: 8
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize'),
+       Categorical(categories=('hidden_descriptors', 'concat_descriptors', 'average_outputs', 'concat_early'), prior=None)])
+AP on the outer test: 0.226
+AUC on the outer test: 0.676
+
+
+Target label: wd_consensus_1
+Option: concat_early
+Descriptors: toxprint
+Hidden: 1024
+Layers: 1
+Heads: 16
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize'),
+       Categorical(categories=('hidden_descriptors', 'concat_descriptors', 'average_outputs', 'concat_early'), prior=None)])
+AP on the outer test: 0.28
+AUC on the outer test: 0.726
+
+
+Target label: wd_consensus_1
+Option: concat_descriptors
+Descriptors: padel1560
+Hidden: 128
+Layers: 4
+Heads: 4
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize'),
+       Categorical(categories=('hidden_descriptors', 'concat_descriptors', 'average_outputs', 'concat_early'), prior=None)])
+AP on the outer test: 0.168
+AUC on the outer test: 0.662
+
+
