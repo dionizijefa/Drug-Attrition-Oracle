@@ -1,0 +1,65 @@
+Bayes opt - XGboost with descriptors
+Descriptors: Toxprint
+Target label: wd_consensus_1
+Max depth: 16
+Learning rate: 0.12766211748151307
+N estimators: 466
+Gamma: 0.293489339024703
+Res space: Space([Integer(low=5, high=20, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.3, prior='uniform', transform='normalize'),
+       Integer(low=50, high=1000, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=1.0, prior='uniform', transform='normalize'),
+       Integer(low=2, high=10, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.1, prior='uniform', transform='normalize'),
+       Real(low=0.6, high=0.9, prior='uniform', transform='normalize'),
+       Real(low=0.5, high=0.99, prior='uniform', transform='normalize')])
+
+
+Descriptors: Padel
+Target label: wd_consensus_1
+Max depth: 20
+Learning rate: 0.3
+N estimators: 561
+Gamma: 0.6346813430679635
+Res space: Space([Integer(low=5, high=20, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.3, prior='uniform', transform='normalize'),
+       Integer(low=50, high=1000, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=1.0, prior='uniform', transform='normalize'),
+       Integer(low=2, high=10, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.1, prior='uniform', transform='normalize'),
+       Real(low=0.6, high=0.9, prior='uniform', transform='normalize'),
+       Real(low=0.5, high=0.99, prior='uniform', transform='normalize')])
+
+
+Descriptors: Alvadesc
+Target label: wd_consensus_1
+Max depth: 20
+Learning rate: 0.01
+N estimators: 50
+Gamma: 0.1783308090033719
+Res space: Space([Integer(low=5, high=20, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.3, prior='uniform', transform='normalize'),
+       Integer(low=50, high=1000, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=1.0, prior='uniform', transform='normalize'),
+       Integer(low=2, high=10, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.1, prior='uniform', transform='normalize'),
+       Real(low=0.6, high=0.9, prior='uniform', transform='normalize'),
+       Real(low=0.5, high=0.99, prior='uniform', transform='normalize')])
+
+
+Descriptors: Rdkit
+Target label: wd_consensus_1
+Max depth: 15
+Learning rate: 0.01
+N estimators: 1000
+Gamma: 1.0
+Res space: Space([Integer(low=5, high=20, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.3, prior='uniform', transform='normalize'),
+       Integer(low=50, high=1000, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=1.0, prior='uniform', transform='normalize'),
+       Integer(low=2, high=10, prior='uniform', transform='normalize'),
+       Real(low=0.01, high=0.1, prior='uniform', transform='normalize'),
+       Real(low=0.6, high=0.9, prior='uniform', transform='normalize'),
+       Real(low=0.5, high=0.99, prior='uniform', transform='normalize')])
+
+

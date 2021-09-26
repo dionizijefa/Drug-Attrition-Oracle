@@ -319,3 +319,120 @@ def conformal_prediction(test_loader, model, approved_probabilities, withdrawn_p
         )
 
     return p_values_approved, p_values_withdrawn, test_probabilities
+
+def smiles2graph_inference(data, **kwargs):
+    """
+    Converts SMILES string to graph Data object
+    :input: SMILES string (str)
+    :return: graph object
+    """
+
+    mol = Chem.MolFromSmiles(data)
+
+    # atoms
+    donor = []
+    acceptor = []
+    features = []
+    names = []
+    donor_string = []
+
+    for atom in mol.GetAtoms():
+        atom_feature_names = []
+        atom_features = []
+        atom_features += one_hot_vector(
+            atom.GetAtomicNum(),
+            [5, 6, 7, 8, 9, 15, 16, 17, 35, 53, 999]
+        )
+
+        atom_feature_names.append(atom.GetSymbol())
+        atom_features += one_hot_vector(
+            atom.GetTotalNumHs(),
+            [0, 1, 2, 3, 4]
+        )
+        atom_feature_names.append(atom.GetTotalNumHs())
+        atom_features += one_hot_vector(
+            atom.GetHybridization(),
+            [HybridizationType.S, HybridizationType.SP, HybridizationType.SP2, HybridizationType.SP3,
+             HybridizationType.SP3D, HybridizationType.SP3D2, HybridizationType.UNSPECIFIED]
+        )
+        atom_feature_names.append(atom.GetHybridization().__str__())
+
+        atom_features.append(atom.IsInRing())
+        atom_features.append(atom.GetIsAromatic())
+
+        if atom.GetIsAromatic() == 1:
+            atom_feature_names.append('Aromatic')
+        else:
+            atom_feature_names.append('Non-aromatic')
+
+        if atom.IsInRing() == 1:
+            atom_feature_names.append('Is in ring')
+        else:
+            atom_feature_names.append('Not in ring')
+
+        donor.append(0)
+        acceptor.append(0)
+
+        donor_string.append('Not a donor or acceptor')
+
+        atom_features = np.array(atom_features, dtype=int)
+        atom_feature_names = np.array(atom_feature_names, dtype=object)
+        features.append(atom_features)
+        names.append(atom_feature_names)
+
+    feats = factory.GetFeaturesForMol(mol)
+    for j in range(0, len(feats)):
+        if feats[j].GetFamily() == 'Donor':
+            node_list = feats[j].GetAtomIds()
+            for k in node_list:
+                donor[k] = 0
+                donor_string[k] = 'Donor'
+        elif feats[j].GetFamily() == 'Acceptor':
+            node_list = feats[j].GetAtomIds()
+            for k in node_list:
+                acceptor[k] = 1
+                donor_string[k] = 'Acceptor'
+
+    features = np.array(features, dtype=int)
+    donor = np.array(donor, dtype=int)
+    donor = donor[..., np.newaxis]
+    acceptor = np.array(acceptor, dtype=int).transpose()
+    acceptor = acceptor[..., np.newaxis]
+    x = np.append(features, donor, axis=1)
+    x = np.append(x, acceptor, axis=1)
+
+    donor_string = np.array(donor_string, dtype=object)
+    donor_string = donor_string[..., np.newaxis]
+
+    names = np.array(names, dtype=object)
+    names = np.append(names, donor_string, axis=1)
+
+    # bonds
+    num_bond_features = 3  # bond type, bond stereo, is_conjugated
+    if len(mol.GetBonds()) > 0:  # mol has bonds
+        edges_list = []
+        for bond in mol.GetBonds():
+            i = bond.GetBeginAtomIdx()
+            j = bond.GetEndAtomIdx()
+
+            # add edges in both directions
+            edges_list.append((i, j))
+            edges_list.append((j, i))
+
+        # data.edge_index: Graph connectivity in COO format with shape [2, num_edges]
+        edge_index = np.array(edges_list, dtype=np.int64).T
+
+    else:  # mol has no bonds
+        edge_index = np.empty((2, 0), dtype=np.int64)
+
+    graph = dict()
+    graph['edge_index'] = Tensor(edge_index).long()
+    graph['node_feat'] = Tensor(x)
+    graph['feature_names'] = names
+
+    if 'descriptors' in kwargs:
+        graph['descriptors'] = Tensor([descriptors.astype(float)])
+        return Data(x=graph['node_feat'], edge_index=graph['edge_index'], feature_names=names,
+                    descriptors=graph['descriptors'])
+    else:
+        return Data(x=graph['node_feat'], edge_index=graph['edge_index'], feature_names=names)
