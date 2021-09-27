@@ -286,7 +286,7 @@ def calibrate(model, calib_loader):
     calib_probabilities = []
     targets = []
     for i in calib_loader:
-        calib_probabilities.append(model.forward(i))
+        calib_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
         targets.append(i.y)
     calib_probabilities = np.array(cat(calib_probabilities).detach().cpu().numpy().flatten())
     calib_probabilities = 1 / (1 + np.exp(-calib_probabilities))
@@ -305,7 +305,7 @@ def conformal_prediction(test_loader, model, approved_probabilities, withdrawn_p
     test_probabilities = []
     test_targets = []
     for i in test_loader:
-        test_probabilities.append(model.forward(i))
+        test_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
         test_targets.append(i.y)
     test_probabilities = np.array(cat(test_probabilities).detach().cpu().numpy().flatten())
     test_probabilities = 1 / (1 + np.exp(-test_probabilities))

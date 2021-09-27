@@ -12,9 +12,10 @@ def optimal_threshold_f1(model, loader):
     probabilities = []
     targets = []
     for i in loader:
-        probabilities.append(model.forward(i))
+        probabilities.append(model.forward(i.x, i.edge_index, i.batch))
         targets.append(i.y)
     probabilities = np.array(cat(probabilities).detach().cpu().numpy().flatten())
+    targets = np.array(cat(targets).detach().cpu().numpy().flatten())
     probabilities = 1 / (1 + np.exp(-probabilities))
 
     predictions = pd.DataFrame({'class': targets, 'probabilities': probabilities})
@@ -75,13 +76,18 @@ def table_metrics(predictions, withdrawn_col, optimal_threshold):
             )
 
     tn, fp, fn, tp = confusion_matrix(predictions_df[withdrawn_col], predictions_df['predicted_class']).ravel()
+    specificity = tn / (tn+fp)
+    balanced_accuracy = 0.5*(
+        recall_wd + specificity
+    )
     results_df = pd.DataFrame(
         {
             'Threshold at opt. F1-score (withdrawn)': optimal_threshold,
-            'Opt. F1-score (withdrawn only)': max(optimal_f1_score),
+            'Opt. F1-score (withdrawn only)': optimal_f1_score,
             'AP withdrawn': ap_wd,
             'AP approved': ap_ad,
             'AUROC withdrawn': auroc_wd,
+            'Balanced accuracy': balanced_accuracy,
             'Precision withdrawn': precision_wd,
             'Recall withdrawn': recall_wd,
             'Precision approved': precision_ad,
@@ -111,10 +117,11 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     fp_at_sig = []
     fn_at_sig = []
     tp_at_sig = []
-    for significance in np.arange(0, 1, 0.05):
+    balanced_accuracy_at_sig = []
+    for significance in np.arange(0, 0.8, 0.05):
         """ We look at predicitions for which it is possible to predict the withdrawn class"""
         predictions_df = predictions.copy()
-        predictions_df = predictions_df.loc[predictions_df['p_wihtdrawn'] > significance]
+        predictions_df = predictions_df.loc[predictions_df['p_withdrawn'] > significance]
         n_examples_at_sig.append(len(predictions_df))
         ap_wd_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
         ap_ad_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities'],
@@ -141,14 +148,20 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
         fp_at_sig.append(fp)
         fn_at_sig.append(fn)
         tp_at_sig.append(tp)
+        recall_wd = recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'])
+        specificity = tn / (tn + fp)
+        balanced_accuracy_at_sig.append(0.5 * (
+                recall_wd + specificity
+        ))
 
     results_df = pd.DataFrame(
         {
-            'Significance': 1-(np.arange(0, 1, 0.05)),
+            'Significance': 1-(np.arange(0, 0.8, 0.05)),
             'F1 (withdrawn) @ signif': f1_at_sig,
             'AP withdrawn @ signif': ap_wd_at_sig,
             'AP approved @ signif': ap_ad_at_sig,
             'AUROC withdrawn @ signif': auroc_wd_at_sig,
+            'Balanced accuracy @ signif': balanced_accuracy_at_sig,
             'Precision withdrawn @ signif': precision_wd_at_sig,
             'Recall withdrawn @ signif': recall_wd_at_sig,
             'Precision approved @ signif': precision_ad_at_sig,

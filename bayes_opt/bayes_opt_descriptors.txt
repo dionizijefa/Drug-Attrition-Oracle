@@ -97,3 +97,19 @@ AP on the outer test: 0.268
 AUC on the outer test: 0.746
 
 
+Target label: wd_consensus_1
+Option: concat_early
+Descriptors: feature_selected
+Hidden: 512
+Layers: 2
+Heads: 8
+Bases: 3
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the outer test: 0.193
+AUC on the outer test: 0.651
+
+
