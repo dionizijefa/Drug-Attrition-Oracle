@@ -79,7 +79,6 @@ def main(
         list_of_desc = [toxprint, padel]
         descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
                                                              how='inner', suffixes=[None, "_right"]), list_of_desc)
-        descriptors_df = descriptors_df[ozren_selected]
         descriptors_len = len(ozren_selected)
 
     else:
