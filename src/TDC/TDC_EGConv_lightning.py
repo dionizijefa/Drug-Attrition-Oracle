@@ -1,3 +1,5 @@
+import sys
+sys.path.append("..")
 from abc import ABC
 from pathlib import Path
 from pprint import pformat
@@ -7,7 +9,7 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.functional import auroc, average_precision
-from src.smiles_only.EGConv import EGConvModel
+from smiles_only.EGConv import EGConvModel
 import pytorch_lightning as pl
 
 
@@ -87,7 +89,7 @@ class EGConvNet(pl.LightningModule, ABC):
                  on_step=False, on_epoch=True, prog_bar=False)
         return {
             "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets"),
+            "targets": metrics.get("targets").long(),
         }
 
     def validation_epoch_end(self, outputs):
@@ -117,7 +119,7 @@ class EGConvNet(pl.LightningModule, ABC):
         metrics = self.shared_step(batch, batch_idx)
         return {
             "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets")
+            "targets": metrics.get("targets").long()
         }
 
     def test_epoch_end(self, outputs):

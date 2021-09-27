@@ -3,13 +3,13 @@ sys.path.append("..")
 from pathlib import Path
 from tdc.single_pred import ADME, Tox
 import click
-from src.TDC.tdc_training import tdc_training
+from tdc_training import tdc_training
 
 root = Path(__file__).resolve().parents[2].absolute()
 
 @click.command()
-@click.option('-batch_size', default=32)
-@click.option('-gpu', default=1)
+@click.option('-batch_size', default=36)
+@click.option('-gpu', default=0)
 @click.option('-seed', default=0)
 @click.option('-epochs', default=100)
 def main(batch_size, gpu, seed, epochs):
