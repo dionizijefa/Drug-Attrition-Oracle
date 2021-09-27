@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 import click
 from EGConv_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader, calibrate, conformal_prediction, smiles2graph
-from src.utils.metrics import table_metrics
+from src.utils.metrics import table_metrics, optimal_threshold_f1, metrics_at_significance
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
@@ -69,6 +69,7 @@ def main(
     cross_approved_p = []
     cross_withdrawn_p = []
     cross_probabilities = []
+    threshold_optimal_f1 = []
 
     for fold in cross_val(data, withdrawn_col, batch_size, seed, n_splits=6):
         model = EGConvNet(
@@ -116,6 +117,7 @@ def main(
         trainer.fit(model, train_loader, val_loader)
 
         #calibrate the model
+        model.eval()
         approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
         p_values_approved, p_values_withdrawn, test_probabilities = conformal_prediction(
             test_loader,
@@ -126,25 +128,32 @@ def main(
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
         cross_probabilities.append(test_probabilities)
+        threshold_optimal_f1.append(optimal_threshold_f1(model, train_loader))
 
 
-        mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
-        mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
-        mean_probabilities = np.mean(np.array(cross_probabilities), axis=0)
 
-        conformal_output = test_data[["chembl_id", withdrawn_col]]
-        conformal_output['p_approved'] = mean_p_approved
-        conformal_output['p_withdrawn'] = mean_p_withdrawn
-        conformal_output['probabilities'] = mean_probabilities
+    mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
+    mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
+    mean_probabilities = np.mean(np.array(cross_probabilities), axis=0)
 
-        results_path = Path(root / 'cross_conformal')
-        if not results_path.exists():
-            results_path.mkdir(exist_ok=True, parents=True)
+    conformal_output = test_data[["chembl_id", withdrawn_col]]
+    conformal_output['p_approved'] = mean_p_approved
+    conformal_output['p_withdrawn'] = mean_p_withdrawn
+    conformal_output['probabilities'] = mean_probabilities
+
+    optimal_threshold = np.mean(threshold_optimal_f1)
+
+    results_path = Path(root / 'cross_conformal')
+    if not results_path.exists():
+        results_path.mkdir(exist_ok=True, parents=True)
 
 
-        conformal_output.to_csv(results_path / 'test_set_outputs.csv')
-        results = table_metrics(conformal_output, withdrawn_col)
-        results.to_csv(results_path / 'results.csv')
+    conformal_output.to_csv(results_path / 'test_set_outputs.csv')
+    results = table_metrics(conformal_output, withdrawn_col, optimal_threshold)
+    results['training_threshold'] = optimal_threshold
+    results_at_significance = metrics_at_significance(conformal_output, withdrawn_col, optimal_threshold)
+    results_at_significance.to_csv(results_path / 'results_at_significance.csv')
+    results.to_csv(results_path / 'results.csv')
 
     if production:
         conf.save_dir = '{}/production/'.format(root)
@@ -222,7 +231,10 @@ def main(
             num_sanity_val_steps=0,
         )
         trainer.fit(model, train_loader, val_loader)
+        model.eval()
         approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+        optimal_threshold = optimal_threshold_f1(model, train_loader)
+        np.savetxt(conf.save_dir+'optimal_threshold.csv', optimal_threshold)
         np.savetxt(conf.save_dir+'approved_calibration.csv', approved_calibration)
         np.savetxt(conf.save_dir+'withdrawn_calibration.csv', withdrawn_calibration)
 

@@ -1,13 +1,46 @@
 import numpy as np
 import pandas as pd
 from sklearn.metrics import precision_score, recall_score, confusion_matrix, average_precision_score, roc_auc_score, \
-    f1_score, auc
+    f1_score
+from torch import cat
 
-def table_metrics(predictions, withdrawn_col):
+
+def optimal_threshold_f1(model, loader):
+    optimal_f1_score = []
+    optimal_threshold = []
+
+    probabilities = []
+    targets = []
+    for i in loader:
+        probabilities.append(model.forward(i))
+        targets.append(i.y)
+    probabilities = np.array(cat(probabilities).detach().cpu().numpy().flatten())
+    probabilities = 1 / (1 + np.exp(-probabilities))
+
+    predictions = pd.DataFrame({'class': targets, 'probabilities': probabilities})
+
+    for threshold in np.arange(1.0, 0, -0.01):
+        predictions_df = predictions.copy()
+        predictions_df['predicted_class'] = 0
+        predictions_df.loc[predictions_df['probabilities'] > threshold, 'predicted_class'] = 1
+        optimal_f1_score.append(
+            f1_score(
+                predictions_df['class'], predictions_df['predicted_class'], average='binary'
+            )
+        )
+        optimal_threshold.append(threshold)
+
+    optimal_f1_index = np.argmax(np.array(optimal_f1_score))
+    optimal_threshold = optimal_threshold[optimal_f1_index]
+    return optimal_threshold
+
+
+def table_metrics(predictions, withdrawn_col, optimal_threshold):
     ap_wd = average_precision_score(predictions[withdrawn_col], predictions['probabilities'])
     ap_ad = average_precision_score(predictions[withdrawn_col], predictions['probabilities'], pos_label=0)
     auroc_wd = roc_auc_score(predictions[withdrawn_col], predictions['probabilities'])
 
+    """
     optimal_f1_score = []
     optimal_threshold = []
     for threshold in np.arange(1.0, 0, -0.01):
@@ -23,6 +56,7 @@ def table_metrics(predictions, withdrawn_col):
 
     optimal_f1_index = np.argmax(np.array(optimal_f1_score))
     optimal_threshold = optimal_threshold[optimal_f1_index]
+    """
 
     # calculate threshold dependent metrics @ optimal weighted f1-score
     predictions_df = predictions.copy()
@@ -35,6 +69,10 @@ def table_metrics(predictions, withdrawn_col):
     recall_wd = recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'])
     recall_ad = recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
                                    pos_label=0)
+
+    optimal_f1_score = f1_score(
+                predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
+            )
 
     tn, fp, fn, tp = confusion_matrix(predictions_df[withdrawn_col], predictions_df['predicted_class']).ravel()
     results_df = pd.DataFrame(
@@ -57,5 +95,72 @@ def table_metrics(predictions, withdrawn_col):
     )
 
     return results_df
+
+def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
+
+    n_examples_at_sig = []
+    ap_wd_at_sig = []
+    ap_ad_at_sig = []
+    auroc_wd_at_sig = []
+    precision_wd_at_sig = []
+    precision_ad_at_sig = []
+    recall_wd_at_sig = []
+    recall_ad_at_sig = []
+    f1_at_sig = []
+    tn_at_sig = []
+    fp_at_sig = []
+    fn_at_sig = []
+    tp_at_sig = []
+    for significance in np.arange(0, 1, 0.05):
+        """ We look at predicitions for which it is possible to predict the withdrawn class"""
+        predictions_df = predictions.copy()
+        predictions_df = predictions_df.loc[predictions_df['p_wihtdrawn'] > significance]
+        n_examples_at_sig.append(len(predictions_df))
+        ap_wd_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
+        ap_ad_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities'],
+                                                    pos_label=0))
+        auroc_wd_at_sig.append(roc_auc_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
+
+
+        predictions_df['predicted_class'] = 0
+        predictions_df.loc[predictions_df['probabilities'] >= optimal_threshold, 'predicted_class'] = 1
+
+        precision_wd_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class']))
+        precision_ad_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
+                                       pos_label=0))
+        recall_wd_at_sig.append(recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class']))
+        recall_ad_at_sig.append(recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
+                                       pos_label=0))
+
+        f1_at_sig.append(f1_score(
+                    predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
+                ))
+
+        tn, fp, fn, tp = confusion_matrix(predictions_df[withdrawn_col], predictions_df['predicted_class']).ravel()
+        tn_at_sig.append(tn)
+        fp_at_sig.append(fp)
+        fn_at_sig.append(fn)
+        tp_at_sig.append(tp)
+
+    results_df = pd.DataFrame(
+        {
+            'Significance': 1-(np.arange(0, 1, 0.05)),
+            'F1 (withdrawn) @ signif': f1_at_sig,
+            'AP withdrawn @ signif': ap_wd_at_sig,
+            'AP approved @ signif': ap_ad_at_sig,
+            'AUROC withdrawn @ signif': auroc_wd_at_sig,
+            'Precision withdrawn @ signif': precision_wd_at_sig,
+            'Recall withdrawn @ signif': recall_wd_at_sig,
+            'Precision approved @ signif': precision_ad_at_sig,
+            'Recall approved @ signif': recall_ad_at_sig,
+            'True positives @ signif': tp_at_sig,
+            'True negatives @ signif': tn_at_sig,
+            'False positives @ signif': fp_at_sig,
+            'False negatives @ signif':  fn_at_sig,
+         }
+    )
+
+    return results_df
+
 
 
