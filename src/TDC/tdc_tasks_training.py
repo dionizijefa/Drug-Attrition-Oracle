@@ -1,3 +1,5 @@
+import sys
+sys.path.append("..")
 from pathlib import Path
 from tdc.single_pred import ADME, Tox
 import click
