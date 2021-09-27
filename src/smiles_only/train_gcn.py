@@ -15,7 +15,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader
-from torch import Tensor
+from torch import Tensor, cat
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -233,6 +233,12 @@ def main(
         trainer.fit(model, train_loader, val_loader)
         model.eval()
         approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+
+        calib_targets = []
+        for i in calib_loader:
+            calib_targets.append(i.y)
+        calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
+
         train_threshold = np.array(optimal_threshold_f1(model, train_loader))
         val_threshold = np.array(optimal_threshold_f1(model, val_loader))
         optimal_threshold = np.mean([train_threshold, val_threshold])
@@ -240,6 +246,7 @@ def main(
             file.write('Optimal threshold: {}'.format(optimal_threshold))
         np.savetxt(conf.save_dir+'approved_calibration.csv', approved_calibration)
         np.savetxt(conf.save_dir+'withdrawn_calibration.csv', withdrawn_calibration)
+        np.savetxt(conf.save_dir+'calib_classes.csv', calib_targets)
 
 
 if __name__ == '__main__':

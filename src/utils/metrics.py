@@ -118,7 +118,7 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     fn_at_sig = []
     tp_at_sig = []
     balanced_accuracy_at_sig = []
-    for significance in np.arange(0, 0.8, 0.05):
+    for significance in np.arange(0, 0.85, 0.05):
         """ We look at predicitions for which it is possible to predict the withdrawn class"""
         predictions_df = predictions.copy()
         predictions_df = predictions_df.loc[predictions_df['p_withdrawn'] > significance]
@@ -156,7 +156,8 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
 
     results_df = pd.DataFrame(
         {
-            'Significance': 1-(np.arange(0, 0.8, 0.05)),
+            'Significance': 1-(np.arange(0, 0.85, 0.05)),
+            'Num. samples @ signif': n_examples_at_sig,
             'F1 (withdrawn) @ signif': f1_at_sig,
             'AP withdrawn @ signif': ap_wd_at_sig,
             'AP approved @ signif': ap_ad_at_sig,
