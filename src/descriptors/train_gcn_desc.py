@@ -1,15 +1,12 @@
 import shutil
 import sys
+sys.path.append("../..")
 from functools import reduce
-
 from pytorch_lightning.loggers import TensorBoardLogger
-from torch import Tensor
+from torch import Tensor, cat
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader
-
 from src.utils.metrics import optimal_threshold_f1, table_metrics, metrics_at_significance
-
-sys.path.append("../..")
 from pathlib import Path
 from time import time, sleep
 import numpy as np
@@ -24,6 +21,7 @@ from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descripto
 from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len
 
 root = Path(__file__).resolve().parents[2].absolute()
+
 
 @click.command()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
@@ -241,7 +239,7 @@ def main(
 
         logger = TensorBoardLogger(
             conf.save_dir,
-            name='egconv_production',
+            name='egconv_descriptors_{}_production'.format(descriptors),
             version='production',
         )
 
@@ -276,13 +274,20 @@ def main(
         trainer.fit(model, train_loader, val_loader)
         model.eval()
         approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+
+        calib_targets = []
+        for i in calib_loader:
+            calib_targets.append(i.y)
+        calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
+
         train_threshold = np.array(optimal_threshold_f1(model, train_loader))
         val_threshold = np.array(optimal_threshold_f1(model, val_loader))
         optimal_threshold = np.mean([train_threshold, val_threshold])
-        with open(conf.save_dir+'optimal_threshold', 'w') as file:
+        with open(conf.save_dir+'{}_optimal_threshold'.format(descriptors), 'w') as file:
             file.write('Optimal threshold: {}'.format(optimal_threshold))
-        np.savetxt(conf.save_dir+'approved_calibration.csv', approved_calibration)
-        np.savetxt(conf.save_dir+'withdrawn_calibration.csv', withdrawn_calibration)
+        np.savetxt(conf.save_dir+'{}_approved_calibration.csv'.format(descriptors), approved_calibration)
+        np.savetxt(conf.save_dir+'{}_withdrawn_calibration.csv'.format(descriptors), withdrawn_calibration)
+        np.savetxt(conf.save_dir+'{}_calib_classes.csv'.format(descriptors), calib_targets)
 
 if __name__ == '__main__':
     main()
