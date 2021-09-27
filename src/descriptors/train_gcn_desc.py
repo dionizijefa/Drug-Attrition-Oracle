@@ -18,7 +18,7 @@ from descriptors_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader, smiles2graph, calibrate, conformal_prediction
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len
-from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len
+from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len, ozren_selected
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -27,7 +27,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-descriptors', default='alvadesc')
+@click.option('-descriptors', default='ozren_selected')
 @click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
@@ -36,7 +36,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-layers', default=4)
 @click.option('-heads', default=4)
 @click.option('-bases', default=7)
-@click.option('-lr', default=0.0001)
+@click.option('-lr', default=0.000344)
 @click.option('-seed', default=0)
 def main(
         train_data,
@@ -82,6 +82,14 @@ def main(
     elif descriptors == 'rdkit':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         descriptors_len = rdkit_descriptors_len
+
+    elif descriptors == 'ozren_selected':
+        toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
+        padel = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        list_of_desc = [toxprint, padel]
+        descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
+                                                             how='inner', suffixes=[None, "_right"]), list_of_desc)
+        descriptors_len = len(ozren_selected)
 
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')

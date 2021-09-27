@@ -1,0 +1,2 @@
+,Threshold at opt. F1-score (withdrawn),Opt. F1-score (withdrawn only),AP withdrawn,AP approved,AUROC withdrawn,Balanced accuracy,Precision withdrawn,Recall withdrawn,Precision approved,Recall approved,True positives,True negatives,False positives,False negatives
+0,0.5019999999999996,0.2285714285714286,0.3198361114771178,0.8116450140177285,0.7684304809149787,0.5678999586606036,0.27586206896551724,0.1951219512195122,0.9098360655737705,0.940677966101695,8,333,21,33
