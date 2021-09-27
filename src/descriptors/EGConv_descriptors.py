@@ -1,6 +1,5 @@
 from torch_geometric.nn import EGConv, global_mean_pool
-from torch.nn import Sequential, BatchNorm1d, ReLU, Linear, Module, Embedding, ModuleList
-from torch.nn.init import xavier_uniform_
+from torch.nn import Sequential, BatchNorm1d, ReLU, Linear, Module, ModuleList
 from torch import cat
 
 

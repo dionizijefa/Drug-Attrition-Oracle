@@ -10,7 +10,7 @@ from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
 from torch import Tensor, cat
 from src.utils.descriptors_list import rdkit_descriptors, alvadesc_descriptors, padel_descriptors_10pct, \
-    toxprint_descriptors_10pct, feature_selected
+    toxprint_descriptors_10pct, feature_selected, alvadesc_100
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
 factory = ChemicalFeatures.BuildFeatureFactory(str(fdef_name))
@@ -341,6 +341,8 @@ def smiles2graph_inference(data, **kwargs):
     """
 
     mol = Chem.MolFromSmiles(data)
+    descriptors = kwargs['descriptors']
+    descriptors = descriptors[alvadesc_100].values[0]
 
     # atoms
     donor = []

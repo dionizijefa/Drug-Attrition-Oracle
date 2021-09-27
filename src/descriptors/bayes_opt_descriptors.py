@@ -19,7 +19,8 @@ import click
 from descriptors_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader, smiles2graph
 from pytorch_lightning.callbacks import EarlyStopping
-from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len
+from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len, \
+    ozren_selected
 from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len
 
 root = Path(__file__).resolve().parents[2].absolute()
@@ -71,6 +72,15 @@ def main(
     elif descriptors == 'rdkit':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         descriptors_len = rdkit_descriptors_len
+
+    elif descriptors == 'ozren_selected':
+        toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
+        padel = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        list_of_desc = [toxprint, padel]
+        descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
+                                                             how='inner', suffixes=[None, "_right"]), list_of_desc)
+        descriptors_df = descriptors_df[ozren_selected]
+        descriptors_len = len(ozren_selected)
 
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
