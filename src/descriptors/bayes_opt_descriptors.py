@@ -257,7 +257,7 @@ def main(
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)
         print('Bases: {}'.format(res.x[3]), file=file)
-        print('Learning rate: {}'.format(res.x[4], file=file))
+        print('Learning rate: {}'.format(res.x[4]), file=file)
         print('Res space: {}'.format(res.space), file=file)
         print('AP on the outer test: {}'.format(test_ap), file=file)
         print('AUC on the outer test: {}'.format(test_auc), file=file)
