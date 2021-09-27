@@ -27,17 +27,17 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-descriptors', default='feature_selected')
+@click.option('-descriptors', default='alvadesc')
 @click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
 @click.option('-production', default=False)
-@click.option('-hidden')
-@click.option('-layers')
-@click.option('-heads')
-@click.option('-bases')
-@click.option('-lr')
-@click.option('-seed')
+@click.option('-hidden', default=1024)
+@click.option('-layers', default=4)
+@click.option('-heads', default=4)
+@click.option('-bases', default=7)
+@click.option('-lr', default=0.0001)
+@click.option('-seed', default=0)
 def main(
         train_data,
         test_data,
@@ -105,8 +105,8 @@ def main(
         num_layers=layers,
         num_heads=heads,
         num_bases=bases,
-        seed=seed,
         lr=lr,
+        seed=seed,
     )
 
     cross_approved_p = []
@@ -162,18 +162,19 @@ def main(
 
         #calibrate the model
         model.eval()
-        approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+        approved_calibration, withdrawn_calibration = calibrate(model, calib_loader, descriptors=True)
         p_values_approved, p_values_withdrawn, test_probabilities = conformal_prediction(
             test_loader,
             model,
             approved_calibration,
-            withdrawn_calibration
+            withdrawn_calibration,
+            descriptors=True
         )
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
         cross_probabilities.append(test_probabilities)
-        training_threshold = optimal_threshold_f1(model, train_loader)
-        validation_threshold = optimal_threshold_f1(model, val_loader)
+        training_threshold = optimal_threshold_f1(model, train_loader, descriptors=True)
+        validation_threshold = optimal_threshold_f1(model, val_loader, descriptors=True)
         threshold_optimal_f1.append(np.mean([training_threshold, validation_threshold]))
 
     mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
@@ -209,17 +210,17 @@ def main(
 
         calib_data_list = []
         for index, row in calib.iterrows():
-            calib_data_list.append(smiles2graph(row, withdrawn_col))
+            calib_data_list.append(smiles2graph(row, withdrawn_col, descriptors=descriptors))
         calib_loader = DataLoader(calib_data_list, num_workers=0, batch_size=batch_size)
 
         val_data_list = []
         for index, row in val.iterrows():
-            val_data_list.append(smiles2graph(row, withdrawn_col))
+            val_data_list.append(smiles2graph(row, withdrawn_col, descriptors=descriptors))
         val_loader = DataLoader(val_data_list, num_workers=0, batch_size=batch_size)
 
         train_data_list = []
         for index, row in train.iterrows():
-            train_data_list.append(smiles2graph(row, withdrawn_col))
+            train_data_list.append(smiles2graph(row, withdrawn_col, descriptors=descriptors))
 
         withdrawn = train[withdrawn_col].value_counts()[1]
         approved = train[withdrawn_col].value_counts()[0]
@@ -235,6 +236,8 @@ def main(
         model = EGConvNet(
             conf.to_hparams(),
             reduce_lr=conf.reduce_lr,
+            descriptors_len=descriptors_len,
+            options='concat_early',
         )
 
         logger = TensorBoardLogger(
@@ -273,15 +276,15 @@ def main(
         )
         trainer.fit(model, train_loader, val_loader)
         model.eval()
-        approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
+        approved_calibration, withdrawn_calibration = calibrate(model, calib_loader, descriptors=True)
 
         calib_targets = []
         for i in calib_loader:
             calib_targets.append(i.y)
         calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
 
-        train_threshold = np.array(optimal_threshold_f1(model, train_loader))
-        val_threshold = np.array(optimal_threshold_f1(model, val_loader))
+        train_threshold = np.array(optimal_threshold_f1(model, train_loader, descriptors=True))
+        val_threshold = np.array(optimal_threshold_f1(model, val_loader, descriptors=True))
         optimal_threshold = np.mean([train_threshold, val_threshold])
         with open(conf.save_dir+'{}_optimal_threshold'.format(descriptors), 'w') as file:
             file.write('Optimal threshold: {}'.format(optimal_threshold))

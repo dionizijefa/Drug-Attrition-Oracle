@@ -282,12 +282,18 @@ def smiles2graph(data, withdrawn_col, **kwargs):
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names)
 
 
-def calibrate(model, calib_loader):
+def calibrate(model, calib_loader, descriptors=False):
+
     calib_probabilities = []
     targets = []
-    for i in calib_loader:
-        calib_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
-        targets.append(i.y)
+    if descriptors:
+        for i in calib_loader:
+            calib_probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
+            targets.append(i.y)
+    else:
+        for i in calib_loader:
+            calib_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
+            targets.append(i.y)
     calib_probabilities = np.array(cat(calib_probabilities).detach().cpu().numpy().flatten())
     calib_probabilities = 1 / (1 + np.exp(-calib_probabilities))
     targets = np.array(cat(targets).detach().cpu().numpy().flatten())
@@ -301,12 +307,17 @@ def calibrate(model, calib_loader):
     return approved_probabilities, withdrawn_probabilities
 
 
-def conformal_prediction(test_loader, model, approved_probabilities, withdrawn_probabilities):
+def conformal_prediction(test_loader, model, approved_probabilities, withdrawn_probabilities, descriptors=False):
     test_probabilities = []
     test_targets = []
-    for i in test_loader:
-        test_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
-        test_targets.append(i.y)
+    if descriptors:
+        for i in test_loader:
+            test_probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
+            test_targets.append(i.y)
+    else:
+        for i in test_loader:
+            test_probabilities.append(model.forward(i.x, i.edge_index, i.batch))
+            test_targets.append(i.y)
     test_probabilities = np.array(cat(test_probabilities).detach().cpu().numpy().flatten())
     test_probabilities = 1 / (1 + np.exp(-test_probabilities))
 

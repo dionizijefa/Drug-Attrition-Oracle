@@ -5,15 +5,21 @@ from sklearn.metrics import precision_score, recall_score, confusion_matrix, ave
 from torch import cat
 
 
-def optimal_threshold_f1(model, loader):
+def optimal_threshold_f1(model, loader, descriptors=False):
     optimal_f1_score = []
     optimal_threshold = []
 
     probabilities = []
     targets = []
-    for i in loader:
-        probabilities.append(model.forward(i.x, i.edge_index, i.batch))
-        targets.append(i.y)
+
+    if descriptors==True:
+        for i in loader:
+            probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
+            targets.append(i.y)
+    else:
+        for i in loader:
+            probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
+            targets.append(i.y)
     probabilities = np.array(cat(probabilities).detach().cpu().numpy().flatten())
     targets = np.array(cat(targets).detach().cpu().numpy().flatten())
     probabilities = 1 / (1 + np.exp(-probabilities))

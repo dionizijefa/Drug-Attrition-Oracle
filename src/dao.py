@@ -45,7 +45,7 @@ class DrugAttritionOracle:
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
         return output
 
-    def predict_class(self, smiles, threshold=0.518333):
+    def predict_class(self, smiles, threshold=0.52499):
         data = smiles2graph_inference(smiles)
         data.batch = zeros(data.num_nodes, dtype=long)
         output = self.model.forward(data.x, data.edge_index, data.batch).detach().cpu().numpy()[0][0]
@@ -100,22 +100,16 @@ class DrugAttritionOracle:
         for i in edge_mask:
             color = viridis(i)
             color_map.append(color)
-        # edge_mask = np.where(edge_mask > 0.80, 1, 0)
-        viridis = pyplot.cm.get_cmap('YlOrRd')
         graph = Data(x=data.x, edge_index=data.edge_index, edge_attrs=color_map, node_labels=data.feature_names)
         g = to_networkx(graph, to_undirected=True, edge_attrs=['edge_attrs'], node_attrs=['node_labels'])
         for i in g.nodes:
             g.nodes[i]['atom'] = g.nodes[i]['node_labels'][0]
         pos = nx.planar_layout(g)
-        pos = nx.spring_layout(g, pos=pos)
-        widths = [x * 10 for x in edge_mask]
-        labels = nx.get_node_attributes(g, 'atom')
         node_feat_importance = pd.DataFrame(data=node_feat_mask[np.newaxis], columns=features, index=[0])
         sns.set(rc={"figure.figsize": (7, 8)})
         fig, ax = plt.subplots()
         ax.set_xlim(0, 1)
         sns.barplot(data=node_feat_importance, orient='horizontal', ax=ax)
-        #return nx.draw(g, pos=pos, labels=labels, width=widths, edge_color=color_map)
 
     def explain_subgraphs(self, smiles, threshold=0, epochs=300):
         explainer = GNNExplainer(self.model, epochs=epochs)
@@ -123,7 +117,6 @@ class DrugAttritionOracle:
         data.batch = zeros(data.num_nodes, dtype=long)
         node_feat_mask, edge_mask = explainer.explain_graph(data.x, data.edge_index)
         edge_mask = edge_mask.detach().numpy()
-        node_feat_mask = node_feat_mask.detach().numpy()
         edge_mask = edge_mask / edge_mask.max()
         viridis = pyplot.cm.get_cmap('YlOrRd')
         color_map = []
@@ -131,7 +124,6 @@ class DrugAttritionOracle:
             color = viridis(i)
             color_map.append(color)
         edge_mask = np.where(edge_mask > threshold, 1, 0)
-        viridis = pyplot.cm.get_cmap('YlOrRd')
         graph = Data(x=data.x, edge_index=data.edge_index, edge_attrs=color_map, node_labels=data.feature_names)
         g = to_networkx(graph, to_undirected=True, edge_attrs=['edge_attrs'], node_attrs=['node_labels'])
         for i in g.nodes:
