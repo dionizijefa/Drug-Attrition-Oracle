@@ -56,35 +56,31 @@ def main(
         test_data = test_data.dropna(subset=[withdrawn_col])
 
     if descriptors == 'alvadesc':
-        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv',
-                                     index_col=0)
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
         #descriptors_len = alvadesc_descriptors_len
         descriptors_len = 100
 
     elif descriptors == 'padel1560':
-        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv',
-                                     index_col=0)
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
         descriptors_len = padel_descriptors_10pct_len
 
     elif descriptors == 'toxprint':
-        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv',
-                                     index_col=0)
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
         descriptors_len = toxprint_descriptors_10pct_len
 
     elif descriptors == 'rdkit':
-        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv',
-                                     index_col=0)
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         descriptors_len = rdkit_descriptors_len
 
     else:
-        rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv', index_col=0)
-        toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv', index_col=0)
-        alvadesc = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv', index_col=0)
-        padel = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv', index_col=0)
+        rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
+        toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
+        alvadesc = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
+        padel = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
         list_of_desc = [rdkit, toxprint, alvadesc, padel]
 
         descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
-                                                        how='inner'), list_of_desc)
+                                                        how='inner', suffixes=[None, "_right"]), list_of_desc)
         descriptors_len = feature_selected_len
 
     data = data.merge(descriptors_df, how='inner', on='chembl_id')
