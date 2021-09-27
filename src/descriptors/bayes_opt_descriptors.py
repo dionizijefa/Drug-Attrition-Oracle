@@ -1,4 +1,5 @@
 import sys
+from functools import reduce
 
 from torch import Tensor
 from torch.utils.data import WeightedRandomSampler
@@ -19,7 +20,7 @@ from descriptors_lightning import Conf, EGConvNet
 from src.utils.data_func import cross_val, create_loader, smiles2graph
 from pytorch_lightning.callbacks import EarlyStopping
 from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len
-from src.utils.descriptors_list import toxprint_descriptors_10pct_len
+from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -27,7 +28,7 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/train/train.csv')
 @click.option('-test_data', default='processing_pipeline/test/test.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
-@click.option('-descriptors', default='rdkit')
+@click.option('-descriptors', default='feature_selected')
 @click.option('-batch_size', default=32)
 @click.option('-epochs', default=100)
 @click.option('-gpu', default=1)
@@ -67,9 +68,20 @@ def main(
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
         descriptors_len = toxprint_descriptors_10pct_len
 
-    else:
+    elif descriptors == 'rdkit':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         descriptors_len = rdkit_descriptors_len
+
+    else:
+        rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
+        toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
+        alvadesc = pd.read_csv(root / 'data/processing_pipeline/descriptors/alvadesc_descriptors.csv')
+        padel = pd.read_csv(root / 'data/processing_pipeline/descriptors/padel1560_descriptors.csv')
+        list_of_desc = [rdkit, toxprint, alvadesc, padel]
+
+        descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
+                                                        how='inner'), list_of_desc)
+        descriptors_len = feature_selected_len
 
     data = data.merge(descriptors_df, how='inner', on='chembl_id')
     test_data = test_data.merge(descriptors_df, how='inner', on='chembl_id')
