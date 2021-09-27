@@ -25,7 +25,7 @@ root = Path(__file__).resolve().parents[1].absolute()
 class DrugAttritionOracle:
     def __init__(self):
         self.model = EGConvNet.load_from_checkpoint(
-            root / 'production/egconv_production/production/checkpoint/epoch=14-step=854.ckpt'
+            root / 'production/egconv_production/production/checkpoint/epoch=16-step=968.ckpt'
         )
         self.model.eval()
         self.approved_calibration = np.loadtxt(root / 'production/approved_calibration.csv') * 100
@@ -45,7 +45,7 @@ class DrugAttritionOracle:
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
         return output
 
-    def predict_class(self, smiles, threshold=0.8399):
+    def predict_class(self, smiles, threshold=0.518333):
         data = smiles2graph_inference(smiles)
         data.batch = zeros(data.num_nodes, dtype=long)
         output = self.model.forward(data.x, data.edge_index, data.batch).detach().cpu().numpy()[0][0]
