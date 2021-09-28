@@ -1,0 +1,178 @@
+Bayes opt TDC - EGConv
+Task: Caco2_Wang
+Hidden: 512
+Layers: 7
+Heads: 8
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 1.168
+
+
+Task: HIA_Hou
+Hidden: 512
+Layers: 7
+Heads: 8
+Bases: 7
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.988
+AUC on the test set: 0.904
+
+
+Task: Pgp_Broccatelli
+Hidden: 256
+Layers: 5
+Heads: 2
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.962
+AUC on the test set: 0.947
+
+
+Task: Bioavailability_Ma
+Hidden: 128
+Layers: 1
+Heads: 2
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.904
+AUC on the test set: 0.694
+
+
+Task: Lipophilicity_AstraZeneca
+Hidden: 2048
+Layers: 8
+Heads: 2
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 0.801
+
+
+Task: Solubility_AqSolDB
+Hidden: 128
+Layers: 3
+Heads: 2
+Bases: 7
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 1.533
+
+
+Task: BBB_Martins
+Hidden: 512
+Layers: 7
+Heads: 8
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.956
+AUC on the test set: 0.903
+
+
+Task: PPBR_AZ
+Hidden: 1024
+Layers: 1
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 15.51
+
+
+Task: VDss_Lombardo
+Hidden: 2048
+Layers: 4
+Heads: 4
+Bases: 2
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 66.528
+
+
+Task: CYP2C19_Veith
+Hidden: 512
+Layers: 6
+Heads: 16
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.841
+AUC on the test set: 0.878
+
+
+Task: CYP2C19_Veith
+Hidden: 128
+Layers: 4
+Heads: 8
+Bases: 5
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.84
+AUC on the test set: 0.881
+
+
+Task: CYP2C19_Veith
+Hidden: 1024
+Layers: 2
+Heads: 2
+Bases: 5
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.867
+AUC on the test set: 0.893
+
+
+Task: CYP2D6_Veith
+Hidden: 512
+Layers: 7
+Heads: 16
+Bases: 5
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.736
+AUC on the test set: 0.876
+
+
