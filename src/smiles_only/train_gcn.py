@@ -233,6 +233,13 @@ def main(
         model.eval()
         approved_calibration, withdrawn_calibration = calibrate(model, calib_loader)
 
+        threshold_calib = DataLoader(train_loader.dataset, batch_size, num_workers=0)
+        training_threshold = optimal_threshold_f1(model, threshold_calib)
+        val_threshold = optimal_threshold_f1(model, val_loader)
+        threshold_optimal_f1 = np.mean([training_threshold, val_threshold])
+        with open(conf.save_dir+'optimal_threshold', 'w') as file:
+            file.write('Optimal threshold: {}'.format(threshold_optimal_f1))
+
         calib_targets = []
         for i in calib_loader:
             calib_targets.append(i.y)

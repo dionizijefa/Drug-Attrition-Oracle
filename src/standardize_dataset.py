@@ -8,7 +8,6 @@ import click
 
 data_path = Path(__file__).resolve().parents[1].absolute()
 
-
 @click.command()
 @click.option('-dataset_path', help='Path of the dataset')
 @click.option('-smiles_col', help='Column name of the smiles column', default='original_smiles')

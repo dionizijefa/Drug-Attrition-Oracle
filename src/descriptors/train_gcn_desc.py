@@ -181,8 +181,11 @@ def main(
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
         cross_probabilities.append(test_probabilities)
-        training_threshold = optimal_threshold_f1(model, calib_loader, descriptors=True)
-        threshold_optimal_f1.append(training_threshold)
+
+        threshold_calib = DataLoader(train_loader.dataset, batch_size, num_workers=0)
+        training_threshold = optimal_threshold_f1(model, threshold_calib, descriptors=True)
+        val_threshold = optimal_threshold_f1(model, val_loader, descriptors=True)
+        threshold_optimal_f1.append(np.mean([training_threshold, val_threshold]))
 
     mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
     mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
@@ -290,13 +293,17 @@ def main(
             calib_targets.append(i.y)
         calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
 
-        train_threshold = np.array(optimal_threshold_f1(model, calib_loader, descriptors=True))
-        optimal_threshold = train_threshold
-        with open(conf.save_dir+'{}_optimal_threshold'.format(descriptors), 'w') as file:
-            file.write('Optimal threshold: {}'.format(optimal_threshold))
-        np.savetxt(conf.save_dir+'{}_approved_calibration.csv'.format(descriptors), approved_calibration)
-        np.savetxt(conf.save_dir+'{}_withdrawn_calibration.csv'.format(descriptors), withdrawn_calibration)
-        np.savetxt(conf.save_dir+'{}_calib_classes.csv'.format(descriptors), calib_targets)
+        threshold_calib = DataLoader(train_loader.dataset, batch_size, num_workers=0)
+        training_threshold = optimal_threshold_f1(model, threshold_calib, descriptors=True)
+        val_threshold = optimal_threshold_f1(model, val_loader, descriptors=True)
+        threshold_optimal_f1 = np.mean([training_threshold, val_threshold])
+        with open(conf.save_dir+'/descriptors_production/{}_optimal_threshold'.format(descriptors), 'w') as file:
+            file.write('Optimal threshold: {}'.format(threshold_optimal_f1))
+        np.savetxt(conf.save_dir+'/descriptors_production/{}_approved_calibration.csv'.format(descriptors),
+                   approved_calibration)
+        np.savetxt(conf.save_dir+'/descriptors_production/{}_withdrawn_calibration.csv'.format(descriptors),
+                   withdrawn_calibration)
+        np.savetxt(conf.save_dir+'/descriptors_production/{}_calib_classes.csv'.format(descriptors), calib_targets)
 
 if __name__ == '__main__':
     main()
