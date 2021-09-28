@@ -237,7 +237,7 @@ def main(
         training_threshold = optimal_threshold_f1(model, threshold_calib)
         val_threshold = optimal_threshold_f1(model, val_loader)
         threshold_optimal_f1 = np.mean([training_threshold, val_threshold])
-        with open(conf.save_dir+'optimal_threshold', 'w') as file:
+        with open(conf.save_dir+'/egconv_production/optimal_threshold', 'w') as file:
             file.write('Optimal threshold: {}'.format(threshold_optimal_f1))
 
         calib_targets = []

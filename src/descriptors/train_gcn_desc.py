@@ -252,8 +252,8 @@ def main(
 
         logger = TensorBoardLogger(
             conf.save_dir,
-            name='egconv_descriptors_{}_production'.format(descriptors),
-            version='production',
+            name='descriptors_production',
+            version='{}'.format(descriptors),
         )
 
         model_checkpoint = ModelCheckpoint(
