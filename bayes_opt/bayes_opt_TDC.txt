@@ -190,3 +190,336 @@ AP on the test set: 0.863
 AUC on the test set: 0.896
 
 
+Task: CYP1A2_Veith
+Hidden: 1024
+Layers: 8
+Heads: 4
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.917
+AUC on the test set: 0.928
+
+
+Task: CYP2C9_Veith
+Hidden: 128
+Layers: 2
+Heads: 16
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.794
+AUC on the test set: 0.891
+
+
+Task: CYP2C9_Substrate_CarbonMangels
+Hidden: 1024
+Layers: 1
+Heads: 2
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.438
+AUC on the test set: 0.664
+
+
+Task: CYP2D6_Substrate_CarbonMangels
+Hidden: 1024
+Layers: 1
+Heads: 16
+Bases: 7
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.743
+AUC on the test set: 0.819
+
+
+Task: CYP3A4_Substrate_CarbonMangels
+Hidden: 512
+Layers: 4
+Heads: 16
+Bases: 5
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.79
+AUC on the test set: 0.716
+
+
+Task: Half_Life_Obach
+Hidden: 2048
+Layers: 1
+Heads: 16
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 23.499
+
+
+Task: Clearance_Hepatocyte_AZ
+Hidden: 512
+Layers: 5
+Heads: 8
+Bases: 3
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 52.214
+
+
+Task: LD50_Zhu
+Hidden: 256
+Layers: 3
+Heads: 4
+Bases: 5
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+MSE on the test set: 0.832
+
+
+Task: hERG
+Hidden: 128
+Layers: 7
+Heads: 16
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.887
+AUC on the test set: 0.77
+
+
+Task: AMES
+Hidden: 256
+Layers: 8
+Heads: 8
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.894
+AUC on the test set: 0.88
+
+
+Task: DILI
+Hidden: 128
+Layers: 6
+Heads: 2
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.955
+AUC on the test set: 0.926
+
+
+Task: Skin Reaction
+Hidden: 512
+Layers: 3
+Heads: 2
+Bases: 3
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.894
+AUC on the test set: 0.765
+
+
+Task: Carcinogens_Languin
+Hidden: 128
+Layers: 1
+Heads: 4
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.804
+AUC on the test set: 0.924
+
+
+Task: ClinTox
+Hidden: 512
+Layers: 7
+Heads: 8
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.136
+AUC on the test set: 0.7
+
+
+Task: nr-ar
+Hidden: 512
+Layers: 5
+Heads: 2
+Bases: 3
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.606
+AUC on the test set: 0.797
+
+
+Task: nr-ar-lbd
+Hidden: 128
+Layers: 4
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.573
+AUC on the test set: 0.878
+
+
+Task: nr-ahr
+Hidden: 2048
+Layers: 1
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.653
+AUC on the test set: 0.897
+
+
+Task: nr-aromatase
+Hidden: 512
+Layers: 3
+Heads: 2
+Bases: 3
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.326
+AUC on the test set: 0.748
+
+
+Task: nr-er
+Hidden: 1024
+Layers: 4
+Heads: 16
+Bases: 2
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.432
+AUC on the test set: 0.707
+
+
+Task: nr-er-lbd
+Hidden: 1024
+Layers: 3
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.454
+AUC on the test set: 0.844
+
+
+Task: nr-ppar-gamma
+Hidden: 512
+Layers: 7
+Heads: 8
+Bases: 6
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.247
+AUC on the test set: 0.869
+
+
+Task: sr-are
+Hidden: 128
+Layers: 1
+Heads: 16
+Bases: 8
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.604
+AUC on the test set: 0.826
+
+
+Task: sr-atad5
+Hidden: 1024
+Layers: 4
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.369
+AUC on the test set: 0.872
+
+
+Task: sr-hse
+Hidden: 128
+Layers: 5
+Heads: 4
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.292
+AUC on the test set: 0.73
+
+
