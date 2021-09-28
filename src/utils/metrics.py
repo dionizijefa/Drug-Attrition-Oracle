@@ -6,6 +6,7 @@ from torch import cat
 
 
 def optimal_threshold_f1(model, loader, descriptors=False):
+    model.eval()
     optimal_f1_score = []
     optimal_threshold = []
 
