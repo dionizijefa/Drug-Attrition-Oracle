@@ -13,11 +13,14 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-seed', default=0)
 @click.option('-epochs', default=100)
 def main(batch_size, gpu, seed, epochs):
-    adme = ['Caco2_Wang', 'HIA_Hou', 'Pgp_Broccatelli', 'Bioavailability_Ma',
-            'Lipophilicity_AstraZeneca', 'Solubility_AqSolDB',
-            'BBB_Martins', 'PPBR_AZ', 'VDss_Lombardo', 'CYP2C19_Veith', 'CYP2D6_Veith', 'CYP3A4_Veith',
-            'CYP1A2_Veith', 'CYP2C9_Veith', 'CYP2C9_Substrate_CarbonMangels', 'CYP2D6_Substrate_CarbonMangels',
-            'CYP3A4_Substrate_CarbonMangels', 'Half_Life_Obach', 'Clearance_Hepatocyte_AZ']
+    adme = [
+        #'Caco2_Wang', 'HIA_Hou', 'Pgp_Broccatelli', 'Bioavailability_Ma',
+        #'Lipophilicity_AstraZeneca', 'Solubility_AqSolDB',
+        #'BBB_Martins',
+        #'PPBR_AZ', #'VDss_Lombardo',
+        'CYP2C19_Veith', 'CYP2D6_Veith', 'CYP3A4_Veith',
+        'CYP1A2_Veith', 'CYP2C9_Veith', 'CYP2C9_Substrate_CarbonMangels', 'CYP2D6_Substrate_CarbonMangels',
+        'CYP3A4_Substrate_CarbonMangels', 'Half_Life_Obach', 'Clearance_Hepatocyte_AZ']
     tox = ['LD50_Zhu', 'hERG', 'AMES', 'DILI', 'Skin Reaction', 'Carcinogens_Languin', 'ClinTox']
     tox_21 = ['nr-ar', 'nr-ar-lbd', 'nr-ahr', 'nr-aromatase', 'nr-er', 'nr-er-lbd', 'nr-ppar-gamma', 'sr-are',
               'sr-atad5', 'sr-hse', 'sr-mmp', 'sr-p53']

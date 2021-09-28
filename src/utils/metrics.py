@@ -18,7 +18,7 @@ def optimal_threshold_f1(model, loader, descriptors=False):
             targets.append(i.y)
     else:
         for i in loader:
-            probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
+            probabilities.append(model.forward(i.x, i.edge_index, i.batch))
             targets.append(i.y)
     probabilities = np.array(cat(probabilities).detach().cpu().numpy().flatten())
     targets = np.array(cat(targets).detach().cpu().numpy().flatten())

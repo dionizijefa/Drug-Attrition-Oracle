@@ -76,13 +76,13 @@ def tdc_training(task, data, seed, batch_size, epochs, gpu):
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, 'Y'))
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
-                                  sampler=sampler)
+                                  sampler=sampler, drop_last=True)
 
     else:
         train_data_list = []
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, 'Y'))
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size)
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size, drop_last=True)
 
 
     valid_loader = create_loader(valid, withdrawn_col='Y', batch_size=batch_size)
@@ -245,13 +245,13 @@ def tdc_training(task, data, seed, batch_size, epochs, gpu):
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, 'Y'))
         train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
-                                  sampler=sampler)
+                                  sampler=sampler, drop_last=True)
 
     else:
         train_data_list = []
         for index, row in train.iterrows():
             train_data_list.append(smiles2graph(row, 'Y'))
-        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size)
+        train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size, drop_last=True)
 
     conf = Conf(
         batch_size=batch_size,

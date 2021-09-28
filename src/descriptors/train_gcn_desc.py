@@ -181,9 +181,8 @@ def main(
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
         cross_probabilities.append(test_probabilities)
-        training_threshold = optimal_threshold_f1(model, train_loader, descriptors=True)
-        validation_threshold = optimal_threshold_f1(model, val_loader, descriptors=True)
-        threshold_optimal_f1.append(np.mean([training_threshold, validation_threshold]))
+        training_threshold = optimal_threshold_f1(model, calib_loader, descriptors=True)
+        threshold_optimal_f1.append(training_threshold)
 
     mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
     mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
@@ -207,7 +206,7 @@ def main(
     results.to_csv(results_path / '{}_results.csv'.format(descriptors))
 
     if production:
-        conf.save_dir = '{}/descriptors_production/'.format(root)
+        conf.save_dir = '{}/production/'.format(root)
         data = pd.concat([data, test_data])
         train, calib = train_test_split(data, test_size=0.15,
                                        stratify=data[withdrawn_col], shuffle=True,
@@ -291,9 +290,8 @@ def main(
             calib_targets.append(i.y)
         calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
 
-        train_threshold = np.array(optimal_threshold_f1(model, train_loader, descriptors=True))
-        val_threshold = np.array(optimal_threshold_f1(model, val_loader, descriptors=True))
-        optimal_threshold = np.mean([train_threshold, val_threshold])
+        train_threshold = np.array(optimal_threshold_f1(model, calib_loader, descriptors=True))
+        optimal_threshold = train_threshold
         with open(conf.save_dir+'{}_optimal_threshold'.format(descriptors), 'w') as file:
             file.write('Optimal threshold: {}'.format(optimal_threshold))
         np.savetxt(conf.save_dir+'{}_approved_calibration.csv'.format(descriptors), approved_calibration)

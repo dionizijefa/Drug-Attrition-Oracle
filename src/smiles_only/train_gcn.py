@@ -71,7 +71,7 @@ def main(
     cross_probabilities = []
     threshold_optimal_f1 = []
 
-    for fold in cross_val(data, withdrawn_col, batch_size, seed, n_splits=6):
+    for count, fold in enumerate(cross_val(data, withdrawn_col, batch_size, seed, n_splits=6)):
         model = EGConvNet(
             conf.to_hparams(),
             reduce_lr=conf.reduce_lr,
@@ -128,10 +128,14 @@ def main(
         cross_approved_p.append(p_values_approved)
         cross_withdrawn_p.append(p_values_withdrawn)
         cross_probabilities.append(test_probabilities)
-        training_threshold = optimal_threshold_f1(model, train_loader)
-        validation_threshold = optimal_threshold_f1(model, val_loader)
-        threshold_optimal_f1.append(np.mean([training_threshold, validation_threshold]))
+        threshold_calib = DataLoader(train_loader.dataset, batch_size, num_workers=0)
+        training_threshold = optimal_threshold_f1(model, threshold_calib)
+        val_threshold = optimal_threshold_f1(model, val_loader)
+        threshold_optimal_f1.append(np.mean([training_threshold, val_threshold]))
 
+    results_path = Path(root / 'cross_conformal')
+    if not results_path.exists():
+        results_path.mkdir(exist_ok=True, parents=True)
 
     mean_p_approved = np.mean(np.array(cross_approved_p), axis=0)
     mean_p_withdrawn = np.mean(np.array(cross_withdrawn_p), axis=0)
@@ -143,11 +147,6 @@ def main(
     conformal_output['probabilities'] = mean_probabilities
 
     optimal_threshold = np.mean(threshold_optimal_f1)
-
-    results_path = Path(root / 'cross_conformal')
-    if not results_path.exists():
-        results_path.mkdir(exist_ok=True, parents=True)
-
 
     conformal_output.to_csv(results_path / 'test_set_outputs.csv')
     results = table_metrics(conformal_output, withdrawn_col, optimal_threshold)
@@ -239,14 +238,9 @@ def main(
             calib_targets.append(i.y)
         calib_targets = np.array(cat(calib_targets).detach().cpu().numpy().flatten())
 
-        train_threshold = np.array(optimal_threshold_f1(model, train_loader))
-        val_threshold = np.array(optimal_threshold_f1(model, val_loader))
-        optimal_threshold = np.mean([train_threshold, val_threshold])
-        with open(conf.save_dir+'optimal_threshold', 'w') as file:
-            file.write('Optimal threshold: {}'.format(optimal_threshold))
-        np.savetxt(conf.save_dir+'approved_calibration.csv', approved_calibration)
-        np.savetxt(conf.save_dir+'withdrawn_calibration.csv', withdrawn_calibration)
-        np.savetxt(conf.save_dir+'calib_classes.csv', calib_targets)
+        np.savetxt(conf.save_dir+'/egconv_production/approved_calibration.csv', approved_calibration)
+        np.savetxt(conf.save_dir+'/egconv_production/withdrawn_calibration.csv', withdrawn_calibration)
+        np.savetxt(conf.save_dir+'/egconv_production/calib_classes.csv', calib_targets)
 
 
 if __name__ == '__main__':
