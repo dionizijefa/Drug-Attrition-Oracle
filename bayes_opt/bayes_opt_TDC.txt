@@ -176,3 +176,17 @@ AP on the test set: 0.736
 AUC on the test set: 0.876
 
 
+Task: CYP3A4_Veith
+Hidden: 512
+Layers: 5
+Heads: 8
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.863
+AUC on the test set: 0.896
+
+
