@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 from sklearn.model_selection import RandomizedSearchCV
-import cPickle
+import pickle
 
 from src.utils.metrics import table_metrics
 
@@ -80,6 +80,13 @@ def main(train_data, test_data, withdrawn_col, seed):
     #If folder exists - add production complementary models
     optimization_results = pd.DataFrame(rf_random.cv_results_)
     optimization_results.to_csv(results_path / 'complementary_optimization.csv')
+
+    #save the predictor
+    predictor_path = Path(root / 'production/complementary_model')
+    if not predictor_path.exists():
+        predictor_path.mkdir(exist_ok=True, parents=True)
+    with open(predictor_path / 'random_forest_classifier.pkl', 'wb') as file:
+        pickle.dump(rf_random.best_estimator_, file)
 
 if __name__ == '__main__':
     main()
