@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../..')
 from pathlib import Path
 import click
 import numpy as np
@@ -6,8 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 from sklearn.model_selection import RandomizedSearchCV
 import pickle
-
-from src.utils.metrics import table_metrics
+from  src.utils.metrics import table_metrics
 
 root = Path(__file__).resolve().parents[2].absolute()
 
