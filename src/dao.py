@@ -25,11 +25,11 @@ root = Path(__file__).resolve().parents[1].absolute()
 class DrugAttritionOracle:
     def __init__(self):
         self.model = EGConvNet.load_from_checkpoint(
-            root / 'production/egconv_production/production/checkpoint/epoch=16-step=968.ckpt'
+            root / 'production/egconv_production/production/checkpoint/epoch=6-step=398.ckpt'
         )
         self.model.eval()
-        self.approved_calibration = np.loadtxt(root / 'production/approved_calibration.csv') * 100
-        self.withdrawn_calibration = np.loadtxt(root / 'production/withdrawn_calibration.csv') * 100
+        self.approved_calibration = np.loadtxt(root / 'production/egconv_production/approved_calibration.csv') * 100
+        self.withdrawn_calibration = np.loadtxt(root / 'production/egconv_production/withdrawn_calibration.csv') * 100
 
     def standardize_molecule(self, smiles):
         try:
@@ -45,12 +45,12 @@ class DrugAttritionOracle:
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
         return output
 
-    def predict_class(self, smiles, threshold=0.4599):
+    def predict_class(self, smiles, threshold=63.5):
         data = smiles2graph_inference(smiles)
         data.batch = zeros(data.num_nodes, dtype=long)
         output = self.model.forward(data.x, data.edge_index, data.batch).detach().cpu().numpy()[0][0]
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
-        if output > threshold:
+        if output < threshold:
             return 'Approved'
         else:
             return 'Withdrawn'

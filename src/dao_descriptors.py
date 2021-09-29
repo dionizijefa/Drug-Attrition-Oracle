@@ -17,6 +17,7 @@ import numpy as np
 from descriptors.descriptors_lightning import EGConvNet
 from utils.data_func import smiles2graph_inference
 from standardiser import standardise
+from utils.descriptors_list import ozren_selected_len
 
 root = Path(__file__).resolve().parents[1].absolute()
 
@@ -24,13 +25,17 @@ root = Path(__file__).resolve().parents[1].absolute()
 class DrugAttritionOracleDescriptors:
     def __init__(self, relative_dir):
         self.model = EGConvNet.load_from_checkpoint(
-            root / 'descriptors_production/egconv_descriptors_alvadesc_production/production/checkpoint/epoch=0-step=56.ckpt',
-            descriptors_len=100,
+            root / relative_dir,
+            descriptors_len=ozren_selected_len,
             options='concat_early'
         )
         self.model.eval()
-        self.approved_calibration = np.loadtxt(root / 'descriptors_production/alvadesc_approved_calibration.csv') * 100
-        self.withdrawn_calibration = np.loadtxt(root / 'descriptors_production/alvadesc_withdrawn_calibration.csv') * 100
+        self.approved_calibration = np.loadtxt(
+            root / 'production/ozren_selected/ozren_selected_approved_calibration.csv'
+        ) * 100
+        self.withdrawn_calibration = np.loadtxt(
+            root / 'production/ozren_selected/ozren_selected_withdrawn_calibration.csv'
+        ) * 100
 
     def standardize_molecule(self, smiles):
         try:
@@ -46,12 +51,12 @@ class DrugAttritionOracleDescriptors:
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
         return output
 
-    def predict_class(self, smiles, descriptors, threshold=0.52499):
+    def predict_class(self, smiles, descriptors, threshold=41.0):
         data = smiles2graph_inference(smiles, descriptors=descriptors)
         data.batch = zeros(data.num_nodes, dtype=long)
         output = self.model.forward(data.x, data.edge_index, data.batch, data.descriptors).detach().cpu().numpy()[0][0]
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
-        if output > threshold:
+        if output < threshold:
             return 'Approved'
         else:
             return 'Withdrawn'

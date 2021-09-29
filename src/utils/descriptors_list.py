@@ -5,6 +5,7 @@ rdkit_descriptors_len = 196
 alvadesc_descriptors_len = 260
 toxprint_descriptors_10pct_len = 57  # same as padel
 feature_selected_len = 396
+ozren_selected_len = 83
 
 rdkit_descriptors = [
     'BalabanJ',

@@ -343,8 +343,10 @@ def smiles2graph_inference(data, **kwargs):
     """
 
     mol = Chem.MolFromSmiles(data)
-    descriptors = kwargs['descriptors']
-    descriptors = descriptors[alvadesc_100].values[0]
+
+    if 'descriptors' in kwargs:
+        descriptors = kwargs['descriptors']
+        descriptors = descriptors[ozren_selected].values[0]
 
     # atoms
     donor = []
