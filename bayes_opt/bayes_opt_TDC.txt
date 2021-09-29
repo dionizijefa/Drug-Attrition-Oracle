@@ -523,3 +523,31 @@ AP on the test set: 0.292
 AUC on the test set: 0.73
 
 
+Task: sr-mmp
+Hidden: 1024
+Layers: 4
+Heads: 16
+Bases: 1
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.831
+AUC on the test set: 0.936
+
+
+Task: sr-p53
+Hidden: 256
+Layers: 3
+Heads: 16
+Bases: 2
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the test set: 0.379
+AUC on the test set: 0.845
+
+

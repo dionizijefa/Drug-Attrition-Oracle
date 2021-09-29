@@ -25,9 +25,9 @@ classification_tasks = ['HIA_Hou','Pgp_Broccatelli', 'Bioavailability_Ma', 'BBB_
 @click.option('-batch_size', default=32)
 @click.option('-seed', default=0)
 def main(train_data, test_data, withdrawn_col, batch_size, seed):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col,'chembl_id']][:30]
+    data = pd.read_csv(root / 'data/{}'.format(train_data))[['standardized_smiles', withdrawn_col,'chembl_id']]
     data = data.sample(frac=1, random_state=seed)  # shuffle
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'chembl_id']][:30]
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data))[['standardized_smiles', withdrawn_col, 'chembl_id']]
 
     data_loader = create_loader(data, withdrawn_col, batch_size)
     test_loader = create_loader(test_data, withdrawn_col, batch_size)
@@ -95,7 +95,7 @@ def main(train_data, test_data, withdrawn_col, batch_size, seed):
     train_results_df['{}'.format(withdrawn_col)] = data[withdrawn_col].values
     train_results_df.to_csv(root / 'data/processing_pipeline/TDC_predictions/train_subtasks_predictions.csv')
 
-    test_results_df = pd.DataFrame(train_results)
+    test_results_df = pd.DataFrame(test_results)
     test_results_df['standardized_smiles'] = test_data['standardized_smiles'].values
     test_results_df['chembl_id'] = test_data['chembl_id'].values
     test_results_df['{}'.format(withdrawn_col)] = test_data[withdrawn_col].values
