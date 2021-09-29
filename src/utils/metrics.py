@@ -13,7 +13,7 @@ def optimal_threshold_f1(model, loader, descriptors=False):
     probabilities = []
     targets = []
 
-    if descriptors==True:
+    if descriptors == True:
         for i in loader:
             probabilities.append(model.forward(i.x, i.edge_index, i.batch, i.descriptors))
             targets.append(i.y)
@@ -76,16 +76,16 @@ def table_metrics(predictions, withdrawn_col, optimal_threshold):
                                    pos_label=0)
     recall_wd = recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'])
     recall_ad = recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
-                                   pos_label=0)
+                             pos_label=0)
 
     optimal_f1_score = f1_score(
-                predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
-            )
+        predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
+    )
 
     tn, fp, fn, tp = confusion_matrix(predictions_df[withdrawn_col], predictions_df['predicted_class']).ravel()
-    specificity = tn / (tn+fp)
-    balanced_accuracy = 0.5*(
-        recall_wd + specificity
+    specificity = tn / (tn + fp)
+    balanced_accuracy = 0.5 * (
+            recall_wd + specificity
     )
     results_df = pd.DataFrame(
         {
@@ -102,15 +102,15 @@ def table_metrics(predictions, withdrawn_col, optimal_threshold):
             'True positives': tp,
             'True negatives': tn,
             'False positives': fp,
-            'False negatives':  fn,
-         },
+            'False negatives': fn,
+        },
         index=[0]
     )
 
     return results_df
 
-def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
 
+def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     n_examples_at_sig = []
     ap_wd_at_sig = []
     ap_ad_at_sig = []
@@ -135,20 +135,19 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
                                                     pos_label=0))
         auroc_wd_at_sig.append(roc_auc_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
 
-
         predictions_df['predicted_class'] = 0
         predictions_df.loc[predictions_df['probabilities'] >= optimal_threshold, 'predicted_class'] = 1
 
         precision_wd_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class']))
         precision_ad_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
-                                       pos_label=0))
+                                                   pos_label=0))
         recall_wd_at_sig.append(recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class']))
         recall_ad_at_sig.append(recall_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
-                                       pos_label=0))
+                                             pos_label=0))
 
         f1_at_sig.append(f1_score(
-                    predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
-                ))
+            predictions_df[withdrawn_col], predictions_df['predicted_class'], average='binary'
+        ))
 
         tn, fp, fn, tp = confusion_matrix(predictions_df[withdrawn_col], predictions_df['predicted_class']).ravel()
         tn_at_sig.append(tn)
@@ -163,7 +162,7 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
 
     results_df = pd.DataFrame(
         {
-            'Significance': 1-(np.arange(0, 0.85, 0.05)),
+            'Significance': 1 - (np.arange(0, 0.85, 0.05)),
             'Num. samples @ signif': n_examples_at_sig,
             'F1 (withdrawn) @ signif': f1_at_sig,
             'AP withdrawn @ signif': ap_wd_at_sig,
@@ -177,11 +176,47 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
             'True positives @ signif': tp_at_sig,
             'True negatives @ signif': tn_at_sig,
             'False positives @ signif': fp_at_sig,
-            'False negatives @ signif':  fn_at_sig,
-         }
+            'False negatives @ signif': fn_at_sig,
+        }
     )
 
     return results_df
 
 
+def conformal_stats(predictions, withdrawn_col):
+    single = []
+    double = []
+    non_prediction = []
+    single_correct = []
+    n_samples = []
+    single_correct_rate = []
+    for p_value in np.arange(0, 1, 0.05):
+        double.append(len(predictions.loc[(predictions['p_approved'] > p_value) &
+                                          (predictions['p_withdrawn'] > p_value)]))
+        non_prediction.append(len(predictions.loc[(predictions['p_approved'] < p_value) &
+                                                  (predictions['p_withdrawn'] < p_value)]))
+        single_a = predictions.loc[(predictions['p_approved'] > p_value) &
+                                   (predictions['p_withdrawn'] < p_value)]
+        single_b = predictions.loc[(predictions['p_approved'] < p_value) &
+                                   (predictions['p_withdrawn'] > p_value)]
+        single_1 = len(single_a)
+        single_2 = len(single_b)
 
+        single_correct_1 = len(single_a.loc[single_a[withdrawn_col] == 0])
+        single_correct_2 = len(single_b.loc[single_b[withdrawn_col] == 1])
+        single.append(single_1 + single_2)
+        single_correct.append(single_correct_1 + single_correct_2)
+        n_samples.append(len(predictions))
+
+        try:  # division by zero error
+            single_correct_rate.append((single_correct_1 + single_correct_2) / (single_1 + single_2))
+        except:
+            single_correct_rate.append(0)
+
+    return pd.DataFrame({'Significance': np.arange(0, 1, 0.05),
+                         'N samples': n_samples,
+                         'Single predictions': single,
+                         'Double predictions': double,
+                         'Non predictions': non_prediction,
+                         'Single correct': single_correct,
+                         'Single correct rate': single_correct_rate})
