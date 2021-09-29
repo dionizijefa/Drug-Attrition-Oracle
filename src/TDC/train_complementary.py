@@ -44,13 +44,13 @@ def main(train_data, test_data, withdrawn_col, seed):
     y_train = data[withdrawn_col]
     X_train = data.drop(columns=['chembl_id', 'standardized_smiles', withdrawn_col])
     y_test = test_data[withdrawn_col]
-    X_test = data.drop(columns=['chembl_id', 'standardized_smiles', withdrawn_col])
+    X_test = test_data.drop(columns=['chembl_id', 'standardized_smiles', withdrawn_col])
 
     rf_random.fit(X_train, y_train)
     predictions = rf_random.best_estimator_.predict_proba(X_test)
 
     predictions_train = rf_random.best_estimator_.predict_proba(X_train)
-    train_pred_df = pd.DataFrame({'probabilities': predictions_train,
+    train_pred_df = pd.DataFrame({'probabilities': predictions_train[:, 1],
                                   'target': y_train})
 
     #optimal threshold F1 withdrawn class random forest
@@ -68,7 +68,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     optimal_f1_index = np.argmax(np.array(optimal_f1_score))
     optimal_threshold = optimal_threshold[optimal_f1_index]
 
-    test_pred_df = pd.DataFrame({'probabilities': predictions,
+    test_pred_df = pd.DataFrame({'probabilities': predictions[:, 1],
                                 withdrawn_col: y_test})
 
     results_path = Path(root / 'complementary_model_results')
