@@ -18,9 +18,9 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-withdrawn_col', default='wd_consensus_1')
 @click.option('-seed', default=0)
 def main(train_data, test_data, withdrawn_col, seed):
-    data = pd.read_csv(root / 'data/{}'.format(train_data))
+    data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
     data = data.sample(frac=1, random_state=seed)  # shuffle
-    test_data = pd.read_csv(root / 'data/{}'.format(test_data))
+    test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)
 
     n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=10)]
     max_features = ['auto', 'sqrt', "log2"]
@@ -48,7 +48,6 @@ def main(train_data, test_data, withdrawn_col, seed):
 
     rf_random.fit(X_train, y_train)
     predictions = rf_random.best_estimator_.predict_proba(X_test)
-
     predictions_train = rf_random.best_estimator_.predict_proba(X_train)
     train_pred_df = pd.DataFrame({'probabilities': predictions_train[:, 1],
                                   'target': y_train})

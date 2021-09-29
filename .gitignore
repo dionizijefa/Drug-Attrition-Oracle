@@ -1,5 +1,4 @@
 /models/
-/results/
 /pretrained_weights.pt
 /data/chembl_0_full.csv
 /data/chembl_0_smiles.csv
@@ -9,6 +8,7 @@
 /src/epoch=6-step=405.ckpt
 /data/descriptors_datasets/
 /src/TDC/data/
-/production/ozren_selected/
+/production/descriptors_production/
 /production/TDC/
 /src/data/
+
