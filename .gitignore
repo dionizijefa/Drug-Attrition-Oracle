@@ -1,5 +1,4 @@
 /models/
-/results/
 /pretrained_weights.pt
 /data/chembl_0_full.csv
 /data/chembl_0_smiles.csv
