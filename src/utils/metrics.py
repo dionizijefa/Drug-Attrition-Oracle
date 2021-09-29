@@ -190,6 +190,8 @@ def conformal_stats(predictions, withdrawn_col):
     single_correct = []
     n_samples = []
     single_correct_rate = []
+    single_approved = []
+    single_withdrawn = []
     for p_value in np.arange(0, 1, 0.05):
         double.append(len(predictions.loc[(predictions['p_approved'] > p_value) &
                                           (predictions['p_withdrawn'] > p_value)]))
@@ -204,6 +206,8 @@ def conformal_stats(predictions, withdrawn_col):
 
         single_correct_1 = len(single_a.loc[single_a[withdrawn_col] == 0])
         single_correct_2 = len(single_b.loc[single_b[withdrawn_col] == 1])
+        single_approved.append(single_correct_1)
+        single_withdrawn.append(single_correct_2)
         single.append(single_1 + single_2)
         single_correct.append(single_correct_1 + single_correct_2)
         n_samples.append(len(predictions))
@@ -219,4 +223,6 @@ def conformal_stats(predictions, withdrawn_col):
                          'Double predictions': double,
                          'Non predictions': non_prediction,
                          'Single correct': single_correct,
-                         'Single correct rate': single_correct_rate})
+                         'Single correct rate': single_correct_rate,
+                         'Single correct approved': single_approved,
+                         'Single correct withdrawn': single_withdrawn})

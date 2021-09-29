@@ -57,7 +57,7 @@ class DrugAttritionOracle:
 
     def conformal(self, smiles, significance=None):
         probability = self.predict_probability(smiles)
-        approved_p_value = (np.searchsorted(self.approved_calibration, probability)) \
+        approved_p_value = (np.searchsorted(self.approved_calibration, (1-probability))) \
                            / (len(self.approved_calibration) + 1)
         withdrawn_p_value = (np.searchsorted(self.withdrawn_calibration, probability)) \
                             / (len(self.withdrawn_calibration) + 1)

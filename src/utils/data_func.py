@@ -327,7 +327,7 @@ def conformal_prediction(test_loader, model, approved_probabilities, withdrawn_p
     p_values_withdrawn = []
     for i in test_probabilities:
         p_values_approved.append(
-            (np.searchsorted(approved_probabilities, i) / (len(approved_probabilities) + 1))
+            (np.searchsorted(approved_probabilities, (1-i)) / (len(approved_probabilities) + 1))
         )
         p_values_withdrawn.append(
             (np.searchsorted(withdrawn_probabilities, i) / (len(withdrawn_probabilities) + 1))
