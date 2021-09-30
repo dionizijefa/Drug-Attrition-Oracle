@@ -51,4 +51,53 @@ Models for predicting wether a drug will be withdrawn from the market. Part of t
     |   ├── train_test_split.py                             # Make train-test split for a dataset
     └── Drug Attrition Oracle.ipynb                         # Notebook with examples of the Drug Attrition Oracle
     
+## Installation
+Create a conda environment from file
+```
+conda env export > environment_droplet.yml
+```
+
+## Using Drug Attrition Oracle
+DAO can be used directly from the Drug Attrition Oracle notebook.
+
+## Processing custom datasets
+DAO offers functionality to standardise smiles strings of an input dataset. Navigate to the src folder and run
+```
+python standardize_dataset.py
+```
+You can also create train-test split based on molecualar scaffolds
+```
+python train_test_split.py
+```
+
+## Training DAO models
+To train the simple GNN model for predicting withdrawn drugs with the conformal method. Navigate to the src/smiles_only folder and run
+```
+python train_gcn.py -production True
+```
+If you want to optimize the hyperparameters of the model you can run
+```
+python bayes_opt.py
+```
+
+## Training descriptors models
+Navigate to the src/descriptors folder and run
+```
+python train_gcn_desc.py -production True
+```
+
+## Training complementary models
+Training complementary models takes a long time, since 38 models are downloaded, optimized and trained. To run, navigate to src/TDC folder and run
+```
+python tdc_tasks_training.py
+```
+After the training is done you can use this to make predictions for your original datasets
+```
+python tdc_inference.py
+```
+And from these predictions, train a complementary model
+```
+python train_complementary.py
+```
+
 
