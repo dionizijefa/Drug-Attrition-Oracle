@@ -87,7 +87,7 @@ python train_gcn_desc.py -production True
 ```
 
 ## Training complementary models
-Training complementary models takes a long time, since 38 models are downloaded, optimized and trained. To run, navigate to src/TDC folder and run
+Training complementary models takes a long time (about 24h on a V100 GPU), since 38 models are downloaded, optimized and trained. To run, navigate to src/TDC folder and run
 ```
 python tdc_tasks_training.py
 ```
