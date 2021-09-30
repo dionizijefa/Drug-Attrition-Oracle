@@ -1,4 +1,5 @@
 import sys
+sys.path.append("..")
 import seaborn as sns
 import networkx as nx
 from matplotlib import pyplot, pyplot as plt
@@ -11,12 +12,10 @@ from rdkit import Chem
 from rdkit.Chem import rdDepictor
 from rdkit.Chem.Draw import rdMolDraw2D
 from torch_geometric.utils import to_networkx
-
-sys.path.append("..")
 from pathlib import Path
 import numpy as np
-from smiles_only.EGConv_lightning import EGConvNet
-from utils.data_func import smiles2graph_inference
+from src.smiles_only.EGConv_lightning import EGConvNet
+from src.utils.data_func import smiles2graph_inference
 from standardiser import standardise
 
 root = Path(__file__).resolve().parents[1].absolute()
@@ -45,7 +44,7 @@ class DrugAttritionOracle:
         output = round((1 / (1 + np.exp(-output)) * 100), 2)
         return output
 
-    def predict_class(self, smiles, threshold=63.5):
+    def predict_class(self, smiles, threshold=53):
         data = smiles2graph_inference(smiles)
         data.batch = zeros(data.num_nodes, dtype=long)
         output = self.model.forward(data.x, data.edge_index, data.batch).detach().cpu().numpy()[0][0]
@@ -57,7 +56,7 @@ class DrugAttritionOracle:
 
     def conformal(self, smiles, significance=None):
         probability = self.predict_probability(smiles)
-        approved_p_value = (np.searchsorted(self.approved_calibration, (1-probability))) \
+        approved_p_value = (np.searchsorted(self.approved_calibration, (100-probability))) \
                            / (len(self.approved_calibration) + 1)
         withdrawn_p_value = (np.searchsorted(self.withdrawn_calibration, probability)) \
                             / (len(self.withdrawn_calibration) + 1)
