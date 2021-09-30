@@ -23,18 +23,20 @@ root = Path(__file__).resolve().parents[1].absolute()
 
 
 class DrugAttritionOracleDescriptors:
-    def __init__(self, relative_dir):
+    def __init__(self):
+        for file in Path(root / 'production/descriptors_production/checkpoint/').iterdir():
+            checkpoint_file = file
         self.model = EGConvNet.load_from_checkpoint(
-            root / relative_dir,
+            str(checkpoint_file),
             descriptors_len=ozren_selected_len,
             options='concat_early'
         )
         self.model.eval()
         self.approved_calibration = np.loadtxt(
-            root / 'production/ozren_selected/ozren_selected_approved_calibration.csv'
+            root / 'production/descriptors_production/ozren_selected_approved_calibration.csv'
         ) * 100
         self.withdrawn_calibration = np.loadtxt(
-            root / 'production/ozren_selected/ozren_selected_withdrawn_calibration.csv'
+            root / 'production/descriptors_production/ozren_selected_withdrawn_calibration.csv'
         ) * 100
 
     def standardize_molecule(self, smiles):
