@@ -21,7 +21,7 @@ from src.utils.data_func import cross_val, create_loader, smiles2graph
 from pytorch_lightning.callbacks import EarlyStopping
 from src.utils.descriptors_list import rdkit_descriptors_len, alvadesc_descriptors_len, padel_descriptors_10pct_len, \
     ozren_selected
-from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len
+from src.utils.descriptors_list import toxprint_descriptors_10pct_len, feature_selected_len, adme_japtox_rdkit_len
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -80,6 +80,10 @@ def main(
         descriptors_df = reduce(lambda left, right: pd.merge(left, right, on=['chembl_id'],
                                                              how='inner', suffixes=[None, "_right"]), list_of_desc)
         descriptors_len = len(ozren_selected)
+
+    elif descriptors == 'adme_japtox_rdkit':
+        descriptors_df = pd.read_csv(root / 'data/processing/pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_len = len()
 
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')

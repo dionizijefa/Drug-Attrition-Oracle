@@ -25,7 +25,7 @@ root = Path(__file__).resolve().parents[1].absolute()
 class DrugAttritionOracle:
     def __init__(self):
         self.model = EGConvNet.load_from_checkpoint(
-            root / 'production/egconv_production/production/checkpoint/epoch=6-step=398.ckpt'
+            root / 'production/egconv_production/production/checkpoint/epoch=1-step=113.ckpt'
         )
         self.model.eval()
         self.approved_calibration = np.loadtxt(root / 'production/egconv_production/approved_calibration.csv') * 100

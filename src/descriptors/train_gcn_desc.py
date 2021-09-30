@@ -91,6 +91,10 @@ def main(
                                                              how='inner', suffixes=[None, "_right"]), list_of_desc)
         descriptors_len = len(ozren_selected)
 
+    elif descriptors == 'adme_japtox_rdkit':
+        descriptors_df = pd.read_csv(root / 'data/processing/pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_len = len()
+
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
