@@ -54,7 +54,7 @@ Models for predicting wether a drug will be withdrawn from the market. Part of t
 ## Installation
 Create a conda environment from file
 ```
-conda env export > environment_droplet.yml
+conda env create -f withdrawn.yml
 ```
 
 ## Using Drug Attrition Oracle
