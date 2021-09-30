@@ -1,9 +1,19 @@
 # Drug-Attrition-Oracle
-### Models for predicting wether a drug will be withdrawn from the market. Part of the AI4EU-MODRAI challenge. 
+Models for predicting wether a drug will be withdrawn from the market. Part of the AI4EU-MODRAI challenge. 
 
 *This project has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement 825619.*
 
 ## Project structure
+    .
+    ├── build                   # Compiled files (alternatively `dist`)
+    ├── docs                    # Documentation files (alternatively `doc`)
+    ├── src                     # Source files (alternatively `lib` or `app`)
+    ├── test                    # Automated tests (alternatively `spec` or `tests`)
+    ├── tools                   # Tools and utilities
+    ├── LICENSE
+    └── README.md
+
+
 .
 ├── bayes_opt                     # Configuration and results of optimization for different models
 ├── complementary_model_results   # Results of complementary models on the test set
