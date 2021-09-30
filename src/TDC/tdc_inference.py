@@ -69,7 +69,7 @@ def main(train_data, test_data, withdrawn_col, batch_size, seed):
         task_counter += 1
         print('\n')
 
-    withdrawn_model_path = root / 'production/egconv_production/production/checkpoint/epoch=6-step=398.ckpt'
+    withdrawn_model_path = root / 'production/egconv_production/production/checkpoint/epoch=1-step=113.ckpt'
     withdrawn_model = WithdrawnModel.load_from_checkpoint(checkpoint_path=withdrawn_model_path)
     withdrawn_model.eval()
 
