@@ -93,7 +93,7 @@ def main(
         descriptors_len = len(ozren_selected)
 
     elif descriptors == 'adme_japtox_rdkit':
-        descriptors_df = pd.read_csv(root / 'data/processing/pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
         descriptors_len = adme_japtox_rdkit_len
 
     else:

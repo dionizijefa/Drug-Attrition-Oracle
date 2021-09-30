@@ -241,7 +241,7 @@ def main(
                                     num_samples=len(samples_weights),
                                     replacement=True)
     train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
-                              sampler=sampler)
+                              sampler=sampler, drop_last=True)
 
     val_loader = create_loader(val, withdrawn_col, batch_size, descriptors=descriptors)
 
