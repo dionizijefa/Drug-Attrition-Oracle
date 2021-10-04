@@ -9,6 +9,6 @@
 /data/descriptors_datasets/
 /src/TDC/data/
 /production/descriptors_production/
-/production/TDC/
 /src/data/
+*.ckpt
 
