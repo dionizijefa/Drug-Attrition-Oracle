@@ -85,6 +85,18 @@ def main(
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
         descriptors_len = adme_japtox_rdkit_len
 
+    elif descriptors == 'adme_japtox_rdkit_60':
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_len = adme_japtox_rdkit_len[:60]
+
+    elif descriptors == 'adme_japtox_rdkit_33_140':
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_len = adme_japtox_rdkit_len[33:140]
+
+    elif descriptors == 'adme_japtox_rdkit_5':
+        descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
+        descriptors_len = 5
+
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
         toxprint = pd.read_csv(root / 'data/processing_pipeline/descriptors/toxprint_descriptors.csv')
