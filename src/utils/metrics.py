@@ -44,6 +44,7 @@ def optimal_threshold_f1(model, loader, descriptors=False):
 
 
 def table_metrics(predictions, withdrawn_col, optimal_threshold):
+    predictions = predictions.dropna()
     ap_wd = average_precision_score(predictions[withdrawn_col], predictions['probabilities'])
     ap_ad = average_precision_score(predictions[withdrawn_col], predictions['probabilities'], pos_label=0)
     auroc_wd = roc_auc_score(predictions[withdrawn_col], predictions['probabilities'])
