@@ -9,8 +9,9 @@ import pandas as pd
 from torch.utils.data import WeightedRandomSampler
 from torch_geometric.data import DataLoader, Data
 from torch import Tensor, cat
-from src.utils.descriptors_list import rdkit_descriptors, alvadesc_descriptors, padel_descriptors_10pct, \
-    toxprint_descriptors_10pct, feature_selected, alvadesc_100, ozren_selected, adme_japtox_rdkit
+from src.utils.descriptors_list import rdkit_descriptors, alvadesc_descriptors, padel_descriptors_10pct
+from src.utils.descriptors_list import toxprint_descriptors_10pct, feature_selected, alvadesc_100, ozren_selected, \
+    adme_japtox_rdkit
 
 fdef_name = Path(RDConfig.RDDataDir) / 'BaseFeatures.fdef'
 factory = ChemicalFeatures.BuildFeatureFactory(str(fdef_name))
@@ -176,7 +177,8 @@ def smiles2graph(data, withdrawn_col, **kwargs):
         elif kwargs['descriptors'] == 'adme_japtox_rdkit_33_140':
             descriptors = descriptors[adme_japtox_rdkit[33:140]]
         elif kwargs['descriptors'] == 'adme_japtox_rdkit_5':
-            descriptors = descriptors[adme_japtox_rdkit.iloc[[0, 2, 33, 40, 52]]]
+            adme = [adme_japtox_rdkit[i] for i in [0, 2, 33, 40, 52]]
+            descriptors = descriptors[adme]
         else:
             descriptors = descriptors[feature_selected]
 
