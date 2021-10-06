@@ -126,6 +126,7 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     fn_at_sig = []
     tp_at_sig = []
     balanced_accuracy_at_sig = []
+    predictions = predictions.dropna()
     for significance in np.arange(0, 0.85, 0.05):
         """ We look at predicitions for which it is possible to predict the withdrawn class"""
         predictions_df = predictions.copy()
