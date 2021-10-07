@@ -215,3 +215,20 @@ AP on the outer test: 0.194
 AUC on the outer test: 0.693
 
 
+Target label: wd_consensus_1
+Option: concat_early
+Descriptors: adme_japtox_rdkit_7
+Hidden: 128
+Layers: 7
+Heads: 4
+Bases: 7
+Learning rate: 0.00023653614103869627
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the outer test: 0.189
+AUC on the outer test: 0.681
+
+
