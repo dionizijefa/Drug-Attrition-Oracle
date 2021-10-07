@@ -104,9 +104,9 @@ def main(
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
         descriptors_len = 107
 
-    elif descriptors == 'adme_japtox_rdkit_5':
+    elif descriptors == 'adme_japtox_rdkit_6':
         descriptors_df = pd.read_csv(root / 'data/processing_pipeline/descriptors/ADME-JapTox-RDKIT.csv')
-        descriptors_len = 5
+        descriptors_len = 6
 
     else:
         rdkit = pd.read_csv(root / 'data/processing_pipeline/descriptors/rdkit_descriptors.csv')
