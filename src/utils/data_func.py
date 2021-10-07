@@ -179,6 +179,9 @@ def smiles2graph(data, withdrawn_col, **kwargs):
         elif kwargs['descriptors'] == 'adme_japtox_rdkit_6':
             adme = [adme_japtox_rdkit[i] for i in [0, 2, 33, 40, 52, 66]]
             descriptors = descriptors[adme]
+        elif kwargs['descriptors'] == 'adme_japtox_rdkit_7':
+            adme = [adme_japtox_rdkit[i] for i in [0, 2, 32, 33, 40, 52, 66]]
+            descriptors = descriptors[adme]
         else:
             descriptors = descriptors[feature_selected]
 
