@@ -90,6 +90,7 @@ def main(train_data, test_data, withdrawn_col, seed):
 
     results = table_metrics_trees(test_pred_df, withdrawn_col)
     results.to_csv(results_path / 'complementary_results_reduced.csv')
+    top_5_features.to_csv(results_path / 'complementary_results_reduced_shap.csv')
 
     # save the predictor
     predictor_path = Path(root / 'production/complementary_model')
