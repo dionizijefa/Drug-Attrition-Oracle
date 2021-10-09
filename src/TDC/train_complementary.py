@@ -1,5 +1,5 @@
 import sys
-from shap.explainers.pytree import TreeExplainer
+import shap
 from xgboost import XGBClassifier
 from pathlib import Path
 import click
@@ -67,7 +67,7 @@ def main(train_data, test_data, withdrawn_col, seed):
 
     """ Reduced model """
     # Selected top 5 features by shapely values
-    explainer = TreeExplainer(rs_model.best_estimator_)
+    explainer = shap.TreeExplainer(rs_model.best_estimator_)
     SHAP_values = explainer.shap_values(X_train)
     top_5_features = list(
         pd.DataFrame(
