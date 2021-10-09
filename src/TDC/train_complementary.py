@@ -64,7 +64,7 @@ def main(train_data, test_data, withdrawn_col, seed):
         max_depth=rs_model.best_params_['max_depth'],
         min_child_weight=rs_model.best_params_['min_child_weight'],
         gamma=rs_model.best_params_['gamma'],
-        colsample_bytree=rs_model.best_params_['colsample_by_tree'],
+        colsample_bytree=rs_model.best_params_['colsample_bytree'],
         scale_pos_weight=rs_model.best_params_['scale_pos_weight']
     )
     merged_train = pd.concat([X_train, X_test])
@@ -111,7 +111,7 @@ def main(train_data, test_data, withdrawn_col, seed):
         max_depth=rs_model_reduced.best_params_['max_depth'],
         min_child_weight=rs_model_reduced.best_params_['min_child_weight'],
         gamma=rs_model_reduced.best_params_['gamma'],
-        colsample_bytree=rs_model_reduced.best_params_['colsample_by_tree'],
+        colsample_bytree=rs_model_reduced.best_params_['colsample_bytree'],
         scale_pos_weight=rs_model_reduced.best_params_['scale_pos_weight']
     )
     classifier_reduced.fit(merged_train[top_5_features], merged_test)

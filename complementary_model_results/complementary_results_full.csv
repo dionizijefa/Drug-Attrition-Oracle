@@ -1,0 +1,2 @@
+,F1 score,AP withdrawn,AP approved,AUROC withdrawn,Balanced accuracy,Precision withdrawn,Recall withdrawn,Precision approved,Recall approved,True positives,True negatives,False positives,False negatives
+0,0.4411764705882353,0.418160401954781,0.7864048613911239,0.8377428689541133,0.7740457489320656,0.3157894736842105,0.7317073170731707,0.9633333333333334,0.8163841807909604,30,289,65,11
