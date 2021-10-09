@@ -58,12 +58,25 @@ def main(train_data, test_data, withdrawn_col, seed):
     optimization_results = pd.DataFrame(rs_model.cv_results_)
     optimization_results.to_csv(results_path / 'complementary_optimization_full.csv')
 
+    # train model on full data
+    classifier = XGBClassifier(
+        learning_rate=rs_model.best_params_['learning_rate'],
+        max_depth=rs_model.best_params_['max_depth'],
+        min_child_weight=rs_model.best_params_['min_child_weight'],
+        gamma=rs_model.best_params_['gamma'],
+        colsample_bytree=rs_model.best_params_['colsample_by_tree'],
+        scale_pos_weight=rs_model.best_params_['scale_pos_weight']
+    )
+    merged_train = pd.concat([X_train, X_test])
+    merged_test = pd.concat([y_train, y_test])
+    classifier.fit(merged_train, merged_test)
     # save the predictor
+
     predictor_path = Path(root / 'production/complementary_model')
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
     with open(predictor_path / 'xgb_classifier_full.pkl', 'wb') as file:
-        pickle.dump(rs_model.best_estimator_, file)
+        pickle.dump(classifier.best_estimator_, file)
 
     """ Reduced model """
     # Selected top 5 features by shapely values
@@ -92,12 +105,23 @@ def main(train_data, test_data, withdrawn_col, seed):
     results.to_csv(results_path / 'complementary_results_reduced.csv')
     top_5_features.to_csv(results_path / 'complementary_results_reduced_shap.csv')
 
+    # train model on full data
+    classifier_reduced = XGBClassifier(
+        learning_rate=rs_model_reduced.best_params_['learning_rate'],
+        max_depth=rs_model_reduced.best_params_['max_depth'],
+        min_child_weight=rs_model_reduced.best_params_['min_child_weight'],
+        gamma=rs_model_reduced.best_params_['gamma'],
+        colsample_bytree=rs_model_reduced.best_params_['colsample_by_tree'],
+        scale_pos_weight=rs_model_reduced.best_params_['scale_pos_weight']
+    )
+    classifier_reduced.fit(merged_train[top_5_features], merged_test)
+
     # save the predictor
     predictor_path = Path(root / 'production/complementary_model')
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
     with open(predictor_path / 'xgb_classifier_reduced.pkl', 'wb') as file:
-        pickle.dump(rs_model_reduced.best_estimator_, file)
+        pickle.dump(classifier_reduced.best_estimator_, file)
 
 
 if __name__ == '__main__':
