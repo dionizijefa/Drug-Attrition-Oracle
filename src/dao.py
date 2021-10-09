@@ -12,7 +12,6 @@ from IPython.core.display import SVG
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 from rdkit.Chem.Draw import rdMolDraw2D
-from torch_geometric.utils import to_networkx
 from pathlib import Path
 import numpy as np
 from src.smiles_only.EGConv_lightning import EGConvNet

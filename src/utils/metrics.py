@@ -110,6 +110,49 @@ def table_metrics(predictions, withdrawn_col, optimal_threshold):
 
     return results_df
 
+def table_metrics_trees(predictions, withdrawn_col):
+    ap_wd = average_precision_score(predictions[withdrawn_col], predictions['probabilities'])
+    ap_ad = average_precision_score(predictions[withdrawn_col], predictions['probabilities'], pos_label=0)
+    auroc_wd = roc_auc_score(predictions[withdrawn_col], predictions['probabilities'])
+
+    # calculate threshold dependent metrics @ optimal weighted f1-score
+    optimal_f1_score = f1_score(
+        predictions[withdrawn_col], predictions['predicted_class'], average='binary'
+    )
+
+    tn, fp, fn, tp = confusion_matrix(predictions[withdrawn_col], predictions['predicted_class']).ravel()
+    specificity = tn / (tn + fp)
+    precision_wd = precision_score(predictions[withdrawn_col], predictions['predicted_class'])
+    precision_ad = precision_score(predictions[withdrawn_col], predictions['predicted_class'],
+                                   pos_label=0)
+    recall_wd = recall_score(predictions[withdrawn_col], predictions['predicted_class'])
+    recall_ad = recall_score(predictions[withdrawn_col], predictions['predicted_class'],
+                             pos_label=0)
+    balanced_accuracy = 0.5 * (
+            recall_wd + specificity
+    )
+
+    results_df = pd.DataFrame(
+        {
+            'F1 score': optimal_f1_score,
+            'AP withdrawn': ap_wd,
+            'AP approved': ap_ad,
+            'AUROC withdrawn': auroc_wd,
+            'Balanced accuracy': balanced_accuracy,
+            'Precision withdrawn': precision_wd,
+            'Recall withdrawn': recall_wd,
+            'Precision approved': precision_ad,
+            'Recall approved': recall_ad,
+            'True positives': tp,
+            'True negatives': tn,
+            'False positives': fp,
+            'False negatives': fn,
+        },
+        index=[0]
+    )
+
+    return results_df
+
 
 def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     n_examples_at_sig = []
