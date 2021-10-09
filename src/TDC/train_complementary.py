@@ -35,6 +35,7 @@ def main(train_data, test_data, withdrawn_col, seed):
         'gamma': [0.0, 0.1, 0.2, 0.3, 0.4],
         'colsample_bytree': [0.3, 0.4, 0.5, 0.7],
         'scale_pos_weight': [5, 10, 15, 20, 35],
+        'n_estimators': [100, 200, 300, 400, 500],
     }
 
     classifier = XGBClassifier()
@@ -65,7 +66,8 @@ def main(train_data, test_data, withdrawn_col, seed):
         min_child_weight=rs_model.best_params_['min_child_weight'],
         gamma=rs_model.best_params_['gamma'],
         colsample_bytree=rs_model.best_params_['colsample_bytree'],
-        scale_pos_weight=rs_model.best_params_['scale_pos_weight']
+        scale_pos_weight=rs_model.best_params_['scale_pos_weight'],
+        n_estimators=rs_model.best_params_['n_estimators'],
     )
     merged_train = pd.concat([X_train, X_test])
     merged_test = pd.concat([y_train, y_test])
@@ -76,7 +78,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
     with open(predictor_path / 'xgb_classifier_full.pkl', 'wb') as file:
-        pickle.dump(classifier.best_estimator_, file)
+        pickle.dump(classifier, file)
 
     """ Reduced model """
     # Selected top 5 features by shapely values
@@ -112,7 +114,8 @@ def main(train_data, test_data, withdrawn_col, seed):
         min_child_weight=rs_model_reduced.best_params_['min_child_weight'],
         gamma=rs_model_reduced.best_params_['gamma'],
         colsample_bytree=rs_model_reduced.best_params_['colsample_bytree'],
-        scale_pos_weight=rs_model_reduced.best_params_['scale_pos_weight']
+        scale_pos_weight=rs_model_reduced.best_params_['scale_pos_weight'],
+        n_estimators=rs_model_reduced.best_params_['n_estimators'],
     )
     classifier_reduced.fit(merged_train[top_5_features], merged_test)
 
@@ -121,7 +124,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
     with open(predictor_path / 'xgb_classifier_reduced.pkl', 'wb') as file:
-        pickle.dump(classifier_reduced.best_estimator_, file)
+        pickle.dump(classifier_reduced, file)
 
 
 if __name__ == '__main__':
