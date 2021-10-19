@@ -25,6 +25,12 @@ def main(train_data, test_data, withdrawn_col, seed):
     train = train.merge(master_atc, how='inner', on='chembl_id')
     test = test.merge(master_atc, how='inner', on='chembl_id')
 
+    train['atc_code'] = train['atc_code'].str.split('0').str[0]
+    train['atc_code'] = train['atc_code'].str.split('1').str[0]
+
+    test['atc_code'] = test['atc_code'].str.split('0').str[0]
+    test['atc_code'] = test['atc_code'].str.split('1').str[0]
+
     params = {
         'learning_rate': [0.05, 0.10, 0.15, 0.20, 0.25, 0.30],
         'max_depth': [3, 4, 5, 6, 8, 10, 12, 15],
