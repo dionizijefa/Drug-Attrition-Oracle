@@ -45,27 +45,33 @@ def main(train_data, test_data, withdrawn_col, seed):
     atc_codes = []
     columns = []
     for i in list(train['atc_code'].unique()):
-        train_subset = train.loc[train['atc_code'] == i]
-        test_subset = test.loc[test['atc_code'] == i]
+        try:
+            train_subset = train.loc[train['atc_code'] == i]
+            test_subset = test.loc[test['atc_code'] == i]
 
-        y_train = train_subset['wd_consensus_1']
-        y_test = test_subset['wd_consensus_1']
-        X_train = train_subset.drop(columns=['wd_consensus_1', 'chembl_id', 'standardized_smiles', 'atc_code'])
-        X_test = test_subset.drop(columns=['wd_consensus_1', 'chembl_id', 'standardized_smiles', 'atc_code'])
+            train_subset = train_subset.drop_duplicates(subset=['chembl_id', 'atc_code'])
+            test_subset = test_subset.drop_duplicates(subset=['chembl_id', 'atc_code'])
 
-        classifier = XGBClassifier()
-        rs_model = RandomizedSearchCV(classifier, param_distributions=params,
-                                      n_iter=100, scoring='average_precision',
-                                      n_jobs=-1, cv=6, verbose=3)
-        rs_model.fit(X_train, y_train)
+            y_train = train_subset['wd_consensus_1']
+            y_test = test_subset['wd_consensus_1']
+            X_train = train_subset.drop(columns=['wd_consensus_1', 'chembl_id', 'standardized_smiles', 'atc_code'])
+            X_test = test_subset.drop(columns=['wd_consensus_1', 'chembl_id', 'standardized_smiles', 'atc_code'])
 
-        predictions = rs_model.best_estimator_.predict_proba(X_test)
-        test_pred_df = pd.DataFrame({'probabilities': predictions[:, 1],
-                                     withdrawn_col: y_test,
-                                     'predicted_class': rs_model.predict(X_test)})
-        results.append(table_metrics_trees(test_pred_df, withdrawn_col).values[0])
-        columns.append(table_metrics_trees(test_pred_df, withdrawn_col).columns)
-        atc_codes.append(i)
+            classifier = XGBClassifier()
+            rs_model = RandomizedSearchCV(classifier, param_distributions=params,
+                                          n_iter=100, scoring='average_precision',
+                                          n_jobs=-1, cv=6, verbose=3)
+            rs_model.fit(X_train, y_train)
+
+            predictions = rs_model.best_estimator_.predict_proba(X_test)
+            test_pred_df = pd.DataFrame({'probabilities': predictions[:, 1],
+                                         withdrawn_col: y_test,
+                                         'predicted_class': rs_model.predict(X_test)})
+            results.append(table_metrics_trees(test_pred_df, withdrawn_col).values[0])
+            columns.append(table_metrics_trees(test_pred_df, withdrawn_col).columns)
+            atc_codes.append(i)
+        except:
+            continue
 
     results_df = pd.DataFrame(results, columns=columns[0], index=atc_codes)
     results_df.to_csv(root / 'complementary_model_results/complementary_disease.csv')
