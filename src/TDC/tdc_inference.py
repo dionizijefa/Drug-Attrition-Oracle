@@ -69,8 +69,11 @@ def main(train_data, test_data, withdrawn_col, batch_size, seed):
         task_counter += 1
         print('\n')
 
-    withdrawn_model_path = root / 'production/egconv_production/production/checkpoint/epoch=1-step=113.ckpt'
-    withdrawn_model = WithdrawnModel.load_from_checkpoint(checkpoint_path=withdrawn_model_path)
+    withdrawn_model_path = Path(root / 'models/egconv_testing/')
+    files = withdrawn_model_path.glob(r'**/*.ckpt')
+    files = [i for i in files]
+
+    withdrawn_model = WithdrawnModel.load_from_checkpoint(checkpoint_path=files[0])
     withdrawn_model.eval()
 
     train_outputs = []

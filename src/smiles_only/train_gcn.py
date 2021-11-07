@@ -249,6 +249,72 @@ def main(
         np.savetxt(conf.save_dir+'/egconv_production/withdrawn_calibration.csv', withdrawn_calibration)
         np.savetxt(conf.save_dir+'/egconv_production/calib_classes.csv', calib_targets)
 
+    """for complementary testing"""
+    conf.save_dir = '{}/models/'.format(root)
+    train, val = train_test_split(data, test_size=0.15,
+                                  stratify=data[withdrawn_col], shuffle=True,
+                                  random_state=seed)
+    val_data_list = []
+    for index, row in val.iterrows():
+        val_data_list.append(smiles2graph(row, withdrawn_col))
+    val_loader = DataLoader(val_data_list, num_workers=0, batch_size=batch_size)
+
+    train_data_list = []
+    for index, row in train.iterrows():
+        train_data_list.append(smiles2graph(row, withdrawn_col))
+
+    withdrawn = train[withdrawn_col].value_counts()[1]
+    approved = train[withdrawn_col].value_counts()[0]
+    class_sample_count = [approved, withdrawn]
+    weights = 1 / Tensor(class_sample_count)
+    samples_weights = weights[train[withdrawn_col].values]
+    sampler = WeightedRandomSampler(samples_weights,
+                                    num_samples=len(samples_weights),
+                                    replacement=True)
+    train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
+                              sampler=sampler)
+
+    model = EGConvNet(
+        conf.to_hparams(),
+        reduce_lr=conf.reduce_lr,
+    )
+
+    logger = TensorBoardLogger(
+        conf.save_dir,
+        name='egconv_testing',
+        version='testing',
+    )
+
+    model_checkpoint = ModelCheckpoint(
+        dirpath=(logger.log_dir + '/checkpoint/'),
+        monitor='val_ap_epoch',
+        mode='max',
+        save_top_k=1,
+    )
+
+    early_stop_callback = EarlyStopping(monitor='val_ap_epoch',
+                                        min_delta=0.00,
+                                        mode='max',
+                                        patience=10,
+                                        verbose=False)
+
+    # Copy this script and all files used in training
+    log_dir = Path(logger.log_dir)
+    log_dir.mkdir(exist_ok=True, parents=True)
+    shutil.copy(Path(__file__), log_dir)
+
+    print("Starting training")
+    trainer = pl.Trainer(
+        max_epochs=epochs,
+        gpus=[gpu],  # [0]  # load from checkpoint instead of resume
+        weights_summary='top',
+        callbacks=[early_stop_callback, model_checkpoint],
+        deterministic=True,
+        auto_lr_find=False,
+        num_sanity_val_steps=0,
+    )
+    trainer.fit(model, train_loader, val_loader)
+
 
 if __name__ == '__main__':
     main()
