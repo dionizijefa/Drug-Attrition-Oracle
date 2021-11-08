@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
 import pickle
-
 sys.path.append('../..')
 from src.utils.metrics import table_metrics_trees
 
@@ -40,7 +39,7 @@ def main(train_data, test_data, withdrawn_col, seed):
 
     classifier = XGBClassifier()
     rs_model = RandomizedSearchCV(classifier, param_distributions=params, n_iter=100, scoring='average_precision',
-                                  n_jobs=-1, cv=6, verbose=3)
+                                  n_jobs=-1, cv=5, verbose=3)
     rs_model.fit(X_train, y_train)
 
     predictions = rs_model.best_estimator_.predict_proba(X_test)
@@ -90,14 +89,23 @@ def main(train_data, test_data, withdrawn_col, seed):
             data=abs(np.mean(SHAP_values, axis=0))[np.newaxis]
         ).transpose().sort_values(0, ascending=False)[:5].index)
 
-    rs_model_reduced = RandomizedSearchCV(classifier, param_distributions=params, n_iter=100,
-                                          scoring='average_precision', n_jobs=-1, cv=6, verbose=3)
+    rs_model_reduced = XGBClassifier(
+        learning_rate=rs_model.best_params_['learning_rate'],
+        max_depth=rs_model.best_params_['max_depth'],
+        min_child_weight=rs_model.best_params_['min_child_weight'],
+        gamma=rs_model.best_params_['gamma'],
+        colsample_bytree=rs_model.best_params_['colsample_bytree'],
+        scale_pos_weight=rs_model.best_params_['scale_pos_weight'],
+        n_estimators=rs_model.best_params_['n_estimators'],
+    )
     rs_model_reduced.fit(X_train[top_5_features], y_train)
 
-    predictions = rs_model_reduced.best_estimator_.predict_proba(X_test[top_5_features])
+    ntree_limit = rs_model_reduced.get_booster().best_ntree_limit
+    predictions = rs_model_reduced.predict_proba(X_test[top_5_features], ntree_limit=ntree_limit)
     test_pred_df = pd.DataFrame({'probabilities': predictions[:, 1],
                                  withdrawn_col: y_test,
-                                 'predicted_class': rs_model_reduced.predict(X_test[top_5_features])})
+                                 'predicted_class': rs_model_reduced.predict(X_test[top_5_features],
+                                                                             ntree_limit=ntree_limit)})
 
     results_path = Path(root / 'complementary_model_results')
     if not results_path.exists():
@@ -111,23 +119,14 @@ def main(train_data, test_data, withdrawn_col, seed):
         ).transpose().sort_values(0, ascending=False)[:5].to_csv(results_path / 'complementary_results_reduced_shap.csv')
 
     # train model on full data
-    classifier_reduced = XGBClassifier(
-        learning_rate=rs_model_reduced.best_params_['learning_rate'],
-        max_depth=rs_model_reduced.best_params_['max_depth'],
-        min_child_weight=rs_model_reduced.best_params_['min_child_weight'],
-        gamma=rs_model_reduced.best_params_['gamma'],
-        colsample_bytree=rs_model_reduced.best_params_['colsample_bytree'],
-        scale_pos_weight=rs_model_reduced.best_params_['scale_pos_weight'],
-        n_estimators=rs_model_reduced.best_params_['n_estimators'],
-    )
-    classifier_reduced.fit(merged_train[top_5_features], merged_test)
+    rs_model_reduced.fit(merged_train[top_5_features], merged_test)
 
     # save the predictor
     predictor_path = Path(root / 'production/complementary_model')
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
     with open(predictor_path / 'xgb_classifier_reduced.pkl', 'wb') as file:
-        pickle.dump(classifier_reduced, file)
+        pickle.dump(rs_model_reduced, file)
 
 
 if __name__ == '__main__':
