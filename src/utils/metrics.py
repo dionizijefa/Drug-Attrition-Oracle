@@ -110,6 +110,7 @@ def table_metrics(predictions, withdrawn_col, optimal_threshold):
 
     return results_df
 
+
 def table_metrics_trees(predictions, withdrawn_col):
     ap_wd = average_precision_score(predictions[withdrawn_col], predictions['probabilities'])
     ap_ad = average_precision_score(predictions[withdrawn_col], predictions['probabilities'], pos_label=0)
@@ -173,16 +174,26 @@ def metrics_at_significance(predictions, withdrawn_col, optimal_threshold):
     for significance in np.arange(0, 0.85, 0.05):
         """ We look at predicitions for which it is possible to predict the withdrawn class"""
         predictions_df = predictions.copy()
-        predictions_df = predictions_df.loc[predictions_df['p_withdrawn'] > significance]
+
+        # check if prob greater than threshold then check significance
+        withdrawns = predictions_df.loc[(predictions_df['probabilities'] >= optimal_threshold) &
+                                        (predictions_df['p_withdrawn'] >= significance)]
+        withdrawns['predicted_class'] = 1
+        approveds = predictions_df.loc[(predictions_df['probabilities'] < optimal_threshold) &
+                                       (predictions_df['p_approved'] >= significance)]
+        approveds['predicted_class'] = 0
+
+        # compute global metrics AUROC and AP and drop examples where both p values are lower than significance
+        predictions_df = predictions_df.loc[(predictions_df['p_withdrawn'] >= significance) |
+                                             (predictions_df['p_approved'] >= significance)]
         n_examples_at_sig.append(len(predictions_df))
         ap_wd_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
         ap_ad_at_sig.append(average_precision_score(predictions_df[withdrawn_col], predictions_df['probabilities'],
                                                     pos_label=0))
         auroc_wd_at_sig.append(roc_auc_score(predictions_df[withdrawn_col], predictions_df['probabilities']))
 
-        predictions_df['predicted_class'] = 0
-        predictions_df.loc[predictions_df['probabilities'] >= optimal_threshold, 'predicted_class'] = 1
-
+        # calculate threshold dependent metrics
+        predictions_df = pd.concat([withdrawns, approveds])
         precision_wd_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class']))
         precision_ad_at_sig.append(precision_score(predictions_df[withdrawn_col], predictions_df['predicted_class'],
                                                    pos_label=0))
@@ -238,14 +249,14 @@ def conformal_stats(predictions, withdrawn_col):
     single_approved = []
     single_withdrawn = []
     for p_value in np.arange(0, 1, 0.05):
-        double.append(len(predictions.loc[(predictions['p_approved'] > p_value) &
-                                          (predictions['p_withdrawn'] > p_value)]))
+        double.append(len(predictions.loc[(predictions['p_approved'] >= p_value) &
+                                          (predictions['p_withdrawn'] >= p_value)]))
         non_prediction.append(len(predictions.loc[(predictions['p_approved'] < p_value) &
                                                   (predictions['p_withdrawn'] < p_value)]))
-        single_a = predictions.loc[(predictions['p_approved'] > p_value) &
+        single_a = predictions.loc[(predictions['p_approved'] >= p_value) &
                                    (predictions['p_withdrawn'] < p_value)]
         single_b = predictions.loc[(predictions['p_approved'] < p_value) &
-                                   (predictions['p_withdrawn'] > p_value)]
+                                   (predictions['p_withdrawn'] >= p_value)]
         single_1 = len(single_a)
         single_2 = len(single_b)
 
@@ -262,7 +273,7 @@ def conformal_stats(predictions, withdrawn_col):
         except:
             single_correct_rate.append(0)
 
-    return pd.DataFrame({'Significance': np.arange(0, 1, 0.05),
+    return pd.DataFrame({'Significance': 1 - np.arange(0, 1, 0.05),
                          'N samples': n_samples,
                          'Single predictions': single,
                          'Double predictions': double,
