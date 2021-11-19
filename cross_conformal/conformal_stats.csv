@@ -1,5 +1,5 @@
 ,Significance,N samples,Single predictions,Double predictions,Non predictions,Single correct,Single correct rate,Single correct approved,Single correct withdrawn
-0,0.0,395,0,394,0,0,0.0,0,0
+0,0.0,395,0,395,0,0,0.0,0,0
 1,0.05,395,24,371,0,20,0.8333333333333334,18,2
 2,0.1,395,71,324,0,57,0.8028169014084507,51,6
 3,0.15000000000000002,395,130,265,0,106,0.8153846153846154,97,9

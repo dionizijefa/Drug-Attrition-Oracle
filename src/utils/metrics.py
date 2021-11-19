@@ -273,7 +273,7 @@ def conformal_stats(predictions, withdrawn_col):
         except:
             single_correct_rate.append(0)
 
-    return pd.DataFrame({'Significance': 1 - np.arange(0, 1, 0.05),
+    return pd.DataFrame({'Significance': np.arange(0, 1, 0.05),
                          'N samples': n_samples,
                          'Single predictions': single,
                          'Double predictions': double,
