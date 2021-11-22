@@ -86,58 +86,104 @@ class EGConvNet(pl.LightningModule, ABC):
         return {
             "predictions": metrics.get("predictions"),
             "targets": metrics.get("targets"),
+            "tox_targets": metrics.get("tox_targets")
         }
 
     def validation_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
         targets = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
+        ap = average_precision(predictions[:, 0], targets)
+        auc = auroc(predictions[:, 0], targets)
 
-        ap = average_precision(predictions, targets)
-        auc = auroc(predictions, targets)
+        ap_tox = average_precision(predictions[:, 1:], tox_targets, num_classes=9)
+        auc_tox = auroc(predictions[:, 1:], tox_targets, num_classes=9, average='weighted')
+
+        weights = torch.Tensor([
+            torch.Tensor([1.1]),
+            torch.Tensor([66.37]),
+            torch.Tensor([132.74]),
+            torch.Tensor([60.05]),
+            torch.Tensor([109.65]),
+            torch.Tensor([100.88]),
+            torch.Tensor([47.58]),
+            torch.Tensor([114.63]),
+            torch.Tensor([109.65]),
+        ])
+
+        weighted = torch.mul(torch.Tensor(ap_tox), weights)
+        ap_tox = torch.sum(torch.Tensor(weighted)) / 742.65
+
+        #ap_tox = torch.sum(torch.Tensor(ap_tox)) / 9
+        ap_tox = torch.sum(torch.Tensor(weighted)) / 742.65
 
         log_metrics = {
-            'val_ap_epoch': ap,
-            'val_auc_epoch': auc
+            'val_ap_epoch': (ap + ap_tox) / 2,
+            'val_auc_epoch': (auc + auc_tox) / 2,
         }
         self.log_dict(log_metrics)
         self.log('val_ap',
-                 ap,
+                 (ap + ap_tox),
                  on_step=False, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
         metrics = self.shared_step(batch, batch_idx)
         return {
             "predictions": metrics.get("predictions"),
-            "targets": metrics.get("targets")
+            "targets": metrics.get("targets"),
+            "tox_targets": metrics.get("tox_targets")
         }
 
     def test_epoch_end(self, outputs):
         predictions = torch.cat([x.get('predictions') for x in outputs], 0)
         target = torch.cat([x.get('targets') for x in outputs], 0)
+        tox_targets = torch.cat([x.get('tox_targets') for x in outputs], 0)
 
-        ap = average_precision(predictions, target)
-        auc = auroc(predictions, target)
+        ap = average_precision(predictions[:, 0], target)
+        auc = auroc(predictions[:, 0], target)
+
+        ap_tox = average_precision(predictions[:, 1:], tox_targets, num_classes=9)
+        auc_tox = auroc(predictions[:, 1:], tox_targets, num_classes=9, average='weighted')
+
+        print(torch.Tensor(ap_tox))
+        weights = torch.Tensor([
+            torch.Tensor([1.1]),
+            torch.Tensor([66.37]),
+            torch.Tensor([132.74]),
+            torch.Tensor([60.05]),
+            torch.Tensor([109.65]),
+            torch.Tensor([100.88]),
+            torch.Tensor([47.58]),
+            torch.Tensor([114.63]),
+            torch.Tensor([109.65]),
+        ])
+
+        weighted = torch.mul(torch.Tensor(ap_tox), weights)
+        ap_tox = torch.sum(torch.Tensor(weighted)) / 742.65
 
         log_metrics = {
             'test_ap': ap,
             'test_auc': auc,
+            'test_ap_tox': ap_tox,
+            'test_auc_tox': auc_tox
         }
         self.log_dict(log_metrics)
 
     def shared_step(self, data, batchidx):
         y_hat = self.model(data.x, data.edge_index, data.batch)
-        print(y_hat)
-        loss_fn_withdrawn = torch.nn.CrossEntropyLoss()
-        loss_fn_toxicity = torch.nnCrossEntropyLoss()
-        loss = loss_fn(y_hat, data.y.unsqueeze(-1))
-        loss = loss_fn(y_hat, data.y.unsqueeze(-1))
-
-        print(error)
+        withdrawn = y_hat[:, 0]
+        toxicities = y_hat[:, 1:]
+        loss_fn_withdrawn = torch.nn.BCEWithLogitsLoss()
+        loss_fn_toxicity = torch.nn.CrossEntropyLoss()
+        loss_wd = loss_fn_withdrawn(withdrawn, data.y)
+        loss_tox = loss_fn_toxicity(toxicities, data.toxicity.long())
+        loss = loss_wd + loss_tox
 
         return {
             'loss': loss,
             'predictions': y_hat,
-            'targets': data.y.unsqueeze(-1).long(),
+            'targets': data.y.long(),
+            'tox_targets': data.toxicity.long(),
         }
 
     def configure_optimizers(self):

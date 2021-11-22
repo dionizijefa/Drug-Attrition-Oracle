@@ -16,7 +16,7 @@ from skopt import gp_minimize
 from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 from time import time
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 
 root = Path(__file__).resolve().parents[2].absolute()
 
@@ -70,18 +70,20 @@ def main(
 
     test_data.loc[test_data['toxicity_type'].isin(other_tox), 'toxicity_type'] = 'Other'
 
-    binarizer = LabelBinarizer()
+    binarizer = LabelEncoder()
     binarizer.fit(data['toxicity_type'])
 
     training_tox_label = binarizer.transform(data['toxicity_type'])
     test_tox_label = binarizer.transform(test_data['toxicity_type'])
-
+    data['tox'] = training_tox_label
+    test_data['tox'] = test_tox_label
+    """
     for i in range(0, 9):
         data['tox_{}'.format(i)] = training_tox_label[:, i]
 
     for i in range(0, 9):
         test_data['tox_{}'.format(i)] = test_tox_label[:, i]
-
+    """
     if withdrawn_col == 'wd_withdrawn':
         data['wd_withdrawn'] = data['wd_withdrawn'].fillna(0)  # withdrawn has only withdrawn mols
         test_data['wd_withdrawn'] = test_data['wd_withdrawn'].fillna(0)
@@ -231,21 +233,25 @@ def main(
     results = trainer.test(model, outer_test_loader)
     test_ap = round(results[0]['test_ap'], 3)
     test_auc = round(results[0]['test_auc'], 3)
+    test_ap_tox = round(results[0]['test_ap_tox'], 3)
+    test_auc_tox = round(results[0]['test_auc_tox'], 3)
 
     print('\n')
     print('AP of the outer test set with optimized parameters: {}'.format(test_ap))
     print('AUC of the outer test set with optimized parameters: {}'.format(test_auc))
+    print('AP TOX of the outer test set with optimized parameters: {}'.format(test_ap_tox))
+    print('AUC TOX of the outer test set with optimized parameters: {}'.format(test_auc_tox))
 
     results_path = Path(root / 'bayes_opt')
 
     if not results_path.exists():
         results_path.mkdir(exist_ok=True, parents=True)
         with open(results_path / "bayes_opt.txt", "w") as file:
-            file.write("Bayes opt - EGConv")
+            file.write("Bayes opt Multitask - EGConv")
             file.write("\n")
 
     with open(results_path / "bayes_opt.txt", "a") as file:
-        print('Target label: {}'.format(withdrawn_col), file=file)
+        print('Target label + tox: {}'.format(withdrawn_col), file=file)
         print('Hidden: {}'.format(res.x[0]), file=file)
         print('Layers: {}'.format(res.x[1]), file=file)
         print('Heads: {}'.format(res.x[2]), file=file)
@@ -254,6 +260,8 @@ def main(
         print('Res space: {}'.format(res.space), file=file)
         print('AP on the outer test: {}'.format(test_ap), file=file)
         print('AUC on the outer test: {}'.format(test_auc), file=file)
+        print('AP TOX on the outer test: {}'.format(test_ap_tox), file=file)
+        print('AUC TOX on the outer test: {}'.format(test_auc_tox), file=file)
         file.write("\n")
         file.write("\n")
 

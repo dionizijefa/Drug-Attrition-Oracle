@@ -186,7 +186,7 @@ def smiles2graph(data, withdrawn_col, **kwargs):
             descriptors = descriptors[feature_selected]
 
     if 'toxicity' in kwargs:
-        toxicity = data.iloc[-9:].values
+        toxicity = data['tox']
 
     mol = Chem.MolFromSmiles(smiles)
 
