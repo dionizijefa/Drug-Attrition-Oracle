@@ -126,9 +126,9 @@ class EGConvNet(pl.LightningModule, ABC):
 
     def shared_step(self, data, batchidx):
         y_hat = self.model(data.x, data.edge_index, data.batch)
-        print(y_hat)
+        print(y_hat[:, 0])
         loss_fn_withdrawn = torch.nn.CrossEntropyLoss()
-        loss_fn_toxicity = torch.nnCrossEntropyLoss()
+        loss_fn_toxicity = torch.nn.CrossEntropyLoss()
         loss = loss_fn(y_hat, data.y.unsqueeze(-1))
         loss = loss_fn(y_hat, data.y.unsqueeze(-1))
 
