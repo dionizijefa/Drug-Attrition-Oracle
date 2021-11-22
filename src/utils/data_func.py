@@ -185,6 +185,9 @@ def smiles2graph(data, withdrawn_col, **kwargs):
         else:
             descriptors = descriptors[feature_selected]
 
+    if 'toxicity' in kwargs:
+        toxicity = data.iloc[-9:].values
+
     mol = Chem.MolFromSmiles(smiles)
 
     # atoms
@@ -288,11 +291,15 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     graph['node_feat'] = Tensor(x)
     graph['y'] = Tensor([y])
     graph['feature_names'] = names
+    graph['toxicity'] = Tensor([toxicity])
 
     if 'descriptors' in kwargs:
         graph['descriptors'] = Tensor([descriptors.astype(float)])
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
                     descriptors=graph['descriptors'])
+    elif 'toxicity' in kwargs:
+        return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
+                    toxicity=graph['toxicity'])
     else:
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names)
 
