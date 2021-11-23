@@ -291,13 +291,13 @@ def smiles2graph(data, withdrawn_col, **kwargs):
     graph['node_feat'] = Tensor(x)
     graph['y'] = Tensor([y])
     graph['feature_names'] = names
-    graph['toxicity'] = Tensor([toxicity])
 
     if 'descriptors' in kwargs:
         graph['descriptors'] = Tensor([descriptors.astype(float)])
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
                     descriptors=graph['descriptors'])
     elif 'toxicity' in kwargs:
+        graph['toxicity'] = Tensor([toxicity])
         return Data(x=graph['node_feat'], edge_index=graph['edge_index'], y=graph['y'], feature_names=names,
                     toxicity=graph['toxicity'])
     else:

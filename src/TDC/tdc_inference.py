@@ -43,7 +43,8 @@ def main(train_data, test_data, withdrawn_col, batch_size, seed):
         task_name = str(subdir).split('/')[-1]
         print('Doing inference for task {}/{}: {}'.format(task_counter, num_tasks, task_name))
         for file in Path(subdir / 'checkpoint').iterdir():
-            checkpoint_file = file
+            if str(file).endswith('.ckpt'):
+                checkpoint_file = file
 
         model = TDCModel.load_from_checkpoint(checkpoint_path=str(checkpoint_file), problem='inference')
         model.eval()
