@@ -13,3 +13,19 @@ AP on the outer test: 0.255
 AUC on the outer test: 0.711
 
 
+Target label + tox: wd_consensus_1
+Hidden: 512
+Layers: 5
+Heads: 8
+Bases: 2
+Res space: Space([Categorical(categories=(128, 256, 512, 1024, 2048), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Categorical(categories=(2, 4, 8, 16), prior=None),
+       Integer(low=1, high=8, prior='uniform', transform='normalize'),
+       Real(low=1e-05, high=0.001, prior='uniform', transform='normalize')])
+AP on the outer test: 0.259
+AUC on the outer test: 0.71
+AP TOX on the outer test: 0.075
+AUC TOX on the outer test: 0.703
+
+

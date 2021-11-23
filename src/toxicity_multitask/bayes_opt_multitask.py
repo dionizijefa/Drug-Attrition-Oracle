@@ -223,11 +223,11 @@ def main(
                                     replacement=True)
     train_data_list = []
     for index, row in train.iterrows():
-        train_data_list.append(smiles2graph(row, withdrawn_col))
+        train_data_list.append(smiles2graph(row, withdrawn_col, toxicity=True))
 
     train_loader = DataLoader(train_data_list, num_workers=0, batch_size=batch_size,
                               sampler=sampler)
-    val_loader = create_loader(val, withdrawn_col, batch_size)
+    val_loader = create_loader(val, withdrawn_col, batch_size, toxicity=True)
 
     trainer.fit(model, train_loader, val_loader)
     results = trainer.test(model, outer_test_loader)
