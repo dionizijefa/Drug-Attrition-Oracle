@@ -115,7 +115,7 @@ def tdc_training(task, data, seed, batch_size, epochs, gpu):
 
         early_stop_callback = EarlyStopping(monitor='result',
                                             min_delta=0.00,
-                                            mode='max',
+                                            mode=('min' if problem == 'regression' else 'max'),
                                             patience=10,
                                             verbose=False)
 
@@ -175,7 +175,7 @@ def tdc_training(task, data, seed, batch_size, epochs, gpu):
 
     early_stop_callback = EarlyStopping(monitor='result',
                                         min_delta=0.00,
-                                        mode='max',
+                                        mode=('min' if problem == 'regression' else 'max'),
                                         patience=10,
                                         verbose=False)
 

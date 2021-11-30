@@ -115,7 +115,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     results.to_csv(results_path / 'complementary_results_reduced.csv')
     pd.DataFrame(
             columns=X_train.columns,
-            data=abs(np.mean(SHAP_values, axis=0))[np.newaxis]
+            data=np.mean(abs(SHAP_values), axis=0)[np.newaxis]
         ).transpose().sort_values(0, ascending=False)[:5].to_csv(results_path / 'complementary_results_reduced_shap.csv')
 
     # train model on full data
