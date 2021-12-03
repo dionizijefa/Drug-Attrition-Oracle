@@ -38,8 +38,8 @@ def standardize_dataset(dataset_path, smiles_col, drop_duplicates):
             scaffolds_generic.append(0)
 
     # drop molecule which can't be standardized
-    list_of_dropped = data.iloc[list_of_dropped][['chembl_id', smiles_col]]
-    list_of_dropped.to_csv(data_path / '{}_standardizer_non_standard_mols.csv'.format(output_name))
+    #list_of_dropped = data.iloc[list_of_dropped][['chembl_id', smiles_col]]
+    #list_of_dropped.to_csv(data_path / '{}_standardizer_non_standard_mols.csv'.format(output_name))
     data['standardized_smiles'] = standardized_smiles
     data['scaffolds'] = scaffolds_generic
     data['standardized_smiles'] = data['standardized_smiles'].fillna(data[smiles_col])
