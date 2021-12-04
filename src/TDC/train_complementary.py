@@ -17,8 +17,9 @@ root = Path(__file__).resolve().parents[2].absolute()
 @click.option('-train_data', default='processing_pipeline/TDC_predictions/train_subtasks_predictions.csv')
 @click.option('-test_data', default='processing_pipeline/TDC_predictions/test_subtasks_predictions.csv')
 @click.option('-withdrawn_col', default='wd_consensus_1')
+@click.option('-prefix', default='')
 @click.option('-seed', default=0)
-def main(train_data, test_data, withdrawn_col, seed):
+def main(train_data, test_data, withdrawn_col, prefix, seed):
     data = pd.read_csv(root / 'data/{}'.format(train_data), index_col=0)
     data = data.sample(frac=1, random_state=seed)  # shuffle
     test_data = pd.read_csv(root / 'data/{}'.format(test_data), index_col=0)
@@ -52,11 +53,11 @@ def main(train_data, test_data, withdrawn_col, seed):
         results_path.mkdir(exist_ok=True, parents=True)
 
     results = table_metrics_trees(test_pred_df, withdrawn_col)
-    results.to_csv(results_path / 'complementary_results_full.csv')
+    results.to_csv(results_path / '{}complementary_results_full.csv'.format(prefix))
 
     # If folder exists - add production complementary models
     optimization_results = pd.DataFrame(rs_model.cv_results_)
-    optimization_results.to_csv(results_path / 'complementary_optimization_full.csv')
+    optimization_results.to_csv(results_path / '{}complementary_optimization_full.csv'.format(prefix))
 
     # train model on full data
     classifier = XGBClassifier(
@@ -76,7 +77,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     predictor_path = Path(root / 'production/complementary_model')
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
-    with open(predictor_path / 'xgb_classifier_full.pkl', 'wb') as file:
+    with open(predictor_path / '{}xgb_classifier_full.pkl'.format(prefix), 'wb') as file:
         pickle.dump(classifier, file)
 
     """ Reduced model """
@@ -112,11 +113,13 @@ def main(train_data, test_data, withdrawn_col, seed):
         results_path.mkdir(exist_ok=True, parents=True)
 
     results = table_metrics_trees(test_pred_df, withdrawn_col)
-    results.to_csv(results_path / 'complementary_results_reduced.csv')
+    results.to_csv(results_path / '{}complementary_results_reduced.csv')
     pd.DataFrame(
             columns=X_train.columns,
             data=np.mean(abs(SHAP_values), axis=0)[np.newaxis]
-        ).transpose().sort_values(0, ascending=False)[:5].to_csv(results_path / 'complementary_results_reduced_shap.csv')
+        ).transpose().sort_values(0, ascending=False)[:5].to_csv(
+        results_path / '{}complementary_results_reduced_shap.csv'.format(prefix)
+    )
 
     # train model on full data
     rs_model_reduced.fit(merged_train[top_5_features], merged_test)
@@ -125,7 +128,7 @@ def main(train_data, test_data, withdrawn_col, seed):
     predictor_path = Path(root / 'production/complementary_model')
     if not predictor_path.exists():
         predictor_path.mkdir(exist_ok=True, parents=True)
-    with open(predictor_path / 'xgb_classifier_reduced.pkl', 'wb') as file:
+    with open(predictor_path / '{}xgb_classifier_reduced.pkl'.format(prefix), 'wb') as file:
         pickle.dump(rs_model_reduced, file)
 
 
