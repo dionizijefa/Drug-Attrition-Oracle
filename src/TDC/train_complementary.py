@@ -113,7 +113,7 @@ def main(train_data, test_data, withdrawn_col, prefix, seed):
         results_path.mkdir(exist_ok=True, parents=True)
 
     results = table_metrics_trees(test_pred_df, withdrawn_col)
-    results.to_csv(results_path / '{}complementary_results_reduced.csv')
+    results.to_csv(results_path / '{}complementary_results_reduced.csv'.format(prefix))
     pd.DataFrame(
             columns=X_train.columns,
             data=np.mean(abs(SHAP_values), axis=0)[np.newaxis]
