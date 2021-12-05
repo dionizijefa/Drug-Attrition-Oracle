@@ -39,7 +39,7 @@ def main(train_data, test_data, withdrawn_col, prefix, seed):
     }
 
     classifier = XGBClassifier()
-    rs_model = RandomizedSearchCV(classifier, param_distributions=params, n_iter=100, scoring='average_precision',
+    rs_model = RandomizedSearchCV(classifier, param_distributions=params, n_iter=300, scoring='roc_auc',
                                   n_jobs=-1, cv=5, verbose=3)
     rs_model.fit(X_train, y_train)
 
